@@ -35,6 +35,7 @@ pub struct Model<'a> {
     tool_call: bool,
     streaming: bool,
     price: Price,
+    updated: &'a str,
 }
 
 impl Model<'_> {

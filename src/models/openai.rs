@@ -16,4 +16,5 @@ pub const GPT_5_4_MINI: Model = Model {
         cached_input: 0.075,
         output: 4.5,
     },
+    updated: "today",
 };

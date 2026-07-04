@@ -1,4 +1,4 @@
-mod models;
+// mod models;
 mod response;
 use response::get_response;
 
@@ -8,7 +8,7 @@ async fn main() {
     let input = String::from("Say hello world");
 
     match get_response(model, input).await {
-        Ok(response) => println!("{response}"),
+        Ok(_) => (),
         Err(error) => eprintln!("{error}"),
     }
 }
