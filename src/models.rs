@@ -34,6 +34,7 @@ pub struct Model<'a> {
     structured_output: bool,
     tool_call: bool,
     streaming: bool,
+    caching: bool,
     price: Price,
     updated: &'a str,
 }

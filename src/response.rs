@@ -1,4 +1,4 @@
-use crate::parser::OpenRouterEvents;
+use crate::parser::{ConversationItem, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
 use futures::StreamExt;
@@ -6,7 +6,10 @@ use std::env;
 
 static BASE_URL: &str = "https://openrouter.ai/api/v1/responses";
 
-pub async fn get_response(model: String, input: String) -> Result<Vec<OpenRouterEvents>, String> {
+pub async fn get_response(
+    model: String,
+    input: &Vec<ConversationItem>,
+) -> Result<Vec<OpenRouterEvents>, String> {
     dotenvy::dotenv().ok();
 
     let api_key =
@@ -37,6 +40,8 @@ pub async fn get_response(model: String, input: String) -> Result<Vec<OpenRouter
             let line = buffer[..newline_index].trim().to_string();
             buffer = buffer[newline_index + 1..].to_string();
 
+            println!("{line}");
+
             if !line.starts_with("data:") {
                 continue;
             }
@@ -49,7 +54,11 @@ pub async fn get_response(model: String, input: String) -> Result<Vec<OpenRouter
 
             let event = match serde_json::from_str::<OpenRouterEvents>(data) {
                 Ok(event) => event,
-                Err(_) => continue,
+                Err(e) => {
+                    eprintln!("failed to parse event: {e}");
+                    eprintln!("raw data: {data}");
+                    continue;
+                }
             };
 
             events.push(event);

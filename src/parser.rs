@@ -1,11 +1,18 @@
+use crate::tools;
+
+use super::tools::ToolDefinition;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ResponseRequest {
+#[derive(Debug, Serialize)]
+pub struct ResponseRequest<'a> {
     model: String,
-    input: Vec<ConversationItem>,
+    input: &'a Vec<ConversationItem>,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<ToolDefinition>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_choice: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +34,20 @@ pub enum ConversationItem {
         summary: Vec<Value>,
         encrypted_content: Option<String>,
         format: Option<String>,
+    },
+    #[serde(rename = "function_call")]
+    ToolCall {
+        id: String,
+        status: ResponseStatus,
+        call_id: String,
+        name: String,
+        arguments: String,
+    },
+    #[serde(rename = "function_call_output")]
+    TollCallOutput {
+        id: String,
+        call_id: String,
+        output: String,
     },
 }
 
@@ -56,12 +77,16 @@ impl ConversationItem {
     }
 }
 
-impl ResponseRequest {
-    pub fn new(model: String, input: String) -> Self {
+impl<'a> ResponseRequest<'a> {
+    pub fn new(model: String, input: &'a Vec<ConversationItem>) -> Self {
+        let get_date_definition = tools::def_get_date();
+
         ResponseRequest {
             model,
-            input: vec![ConversationItem::new_user_message(input)],
+            input,
             stream: true,
+            tools: Some(vec![get_date_definition]),
+            tool_choice: Some("auto".to_string()),
         }
     }
 }
@@ -150,22 +175,3 @@ pub enum OpenRouterEvents {
     #[serde(rename = "response.completed")]
     ResponseCompleted { response: ResponseCompletedItem },
 }
-
-// struct Parser {}
-
-// impl Parser {
-//     fn new() -> Self {
-//         Self {}
-//     }
-
-//     fn parse_open_router_events(event: String) -> OpenRouterEvents {
-//         let v = match event.get("type")) {
-//             "response.created" => handle_response_created(event)
-//             _ => {}
-//         }
-//     }
-
-//     fn handle_response_created(event: Value) -> OpenRouterEvents::ResponseCreated {
-//         let value = serde_json::from_value::<OpenRouterEvents::ResponseCreated>(event).map_err(|e| e.to_string())?;
-//     }
-// }
