@@ -5,6 +5,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EffortLevel {
+    Minimal,
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Reasoning<'a> {
+    effort: &'a EffortLevel,
+}
+
+#[derive(Debug, Serialize)]
 pub struct ResponseRequest<'a> {
     model: String,
     input: &'a Vec<ConversationItem>,
@@ -13,6 +28,7 @@ pub struct ResponseRequest<'a> {
     tools: Option<Vec<ToolDefinition>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
+    reasoning: Option<Reasoning<'a>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,15 +94,25 @@ impl ConversationItem {
 }
 
 impl<'a> ResponseRequest<'a> {
-    pub fn new(model: String, input: &'a Vec<ConversationItem>) -> Self {
-        let get_date_definition = tools::def_get_date();
+    pub fn new(
+        model: String,
+        input: &'a Vec<ConversationItem>,
+        effort: Option<&'a EffortLevel>,
+    ) -> Self {
+        let sys_tool_definitions = tools::SystemTools::all()
+            .iter()
+            .map(|tool| tool.definition())
+            .collect();
+
+        let reasoning = effort.map(|eff| Reasoning { effort: eff });
 
         ResponseRequest {
             model,
             input,
             stream: true,
-            tools: Some(vec![get_date_definition]),
+            tools: Some(sys_tool_definitions),
             tool_choice: Some("auto".to_string()),
+            reasoning,
         }
     }
 }
@@ -166,6 +192,15 @@ pub enum OpenRouterEvents {
         item_id: String,
         content_index: u16,
         part: Content,
+    },
+    #[serde(rename = "response.reasoning_summary_part.added")]
+    ResponseReasoningSummartPartAdded { summary_index: u16, part: Content },
+    #[serde(rename = "response.reasoning_summary_text.delta")]
+    ResponseReasoningSummaryTextDelta {
+        output_index: u16,
+        item_id: String,
+        summary_index: u16,
+        delta: String,
     },
     #[serde(rename = "response.output_item.done")]
     ResponseOutputItemDone {

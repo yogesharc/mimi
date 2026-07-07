@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use serde_json::Value;
-
+pub mod file_search;
+use file_search::Search;
 // =========== Tools Structs and Enums =============
 
 #[derive(Debug, Serialize)]
@@ -11,7 +12,7 @@ pub struct ToolDefinition {
     name: String,
     description: String,
     strict: bool,
-    parameters: Parameters,
+    parameters: Option<Parameters>,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,6 +32,15 @@ pub struct Property {
     // property_enum: Option<Vec<String>>,
 }
 
+impl Default for Property {
+    fn default() -> Self {
+        Self {
+            r#type: "string".to_string(),
+            description: String::new(),
+        }
+    }
+}
+
 impl ToolDefinition {
     pub fn new(
         name: String,
@@ -44,11 +54,11 @@ impl ToolDefinition {
             name,
             description,
             strict,
-            parameters: Parameters {
+            parameters: Some(Parameters {
                 r#type: "object".to_string(),
                 properties,
                 required,
-            },
+            }),
         }
     }
 }
@@ -74,18 +84,44 @@ pub fn def_get_date() -> ToolDefinition {
     ToolDefinition::new(name, description, strict, properties, required)
 }
 
+pub fn get_weather(_args: Value) -> Result<Value, String> {
+    Ok(serde_json::json!("Sunny"))
+}
+
+pub fn def_get_weather() -> ToolDefinition {
+    let name = String::from("get_weather");
+    let description = String::from("Get dummy weather for a place");
+    let strict = true;
+    let mut properties = HashMap::new();
+    let property = Property {
+        r#type: "string".to_string(),
+        description: "Place to get weather for, e.g. Kathmandu".to_string(),
+    };
+    properties.insert("place".to_string(), property);
+    let required = Some(vec![String::from("place")]);
+    ToolDefinition::new(name, description, strict, properties, required)
+}
+
 // =========== System Tools =============
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SystemTools {
     GetDate,
+    GetWeather,
+    SearchFiles,
 }
 
 impl SystemTools {
+    pub fn all() -> Vec<Self> {
+        vec![Self::GetDate, Self::GetWeather, Self::SearchFiles]
+    }
+
     pub fn variant_from_name(name: &str) -> Option<Self> {
         match name {
             "get_date" => Some(Self::GetDate),
+            "get_weather" => Some(Self::GetWeather),
+            "search_files" => Some(Self::SearchFiles),
             _ => None,
         }
     }
@@ -93,14 +129,21 @@ impl SystemTools {
     pub fn definition(&self) -> ToolDefinition {
         match self {
             SystemTools::GetDate => def_get_date(),
+            SystemTools::GetWeather => def_get_weather(),
+            SystemTools::SearchFiles => Search::def_search_files(),
         }
     }
 
-    pub fn execute(&self, arguments: &str) -> Result<Value, String> {
+    pub fn execute(&self, arguments: &str, search: Option<&Search>) -> Result<Value, String> {
         let args: Value = serde_json::from_str(arguments).map_err(|e| e.to_string())?;
 
         match self {
             SystemTools::GetDate => get_date(args),
+            SystemTools::GetWeather => get_weather(args),
+            SystemTools::SearchFiles => {
+                let search = search.ok_or_else(|| "search state is required".to_string())?;
+                search.search_files(args)
+            }
         }
     }
 }

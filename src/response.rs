@@ -1,4 +1,4 @@
-use crate::parser::{ConversationItem, OpenRouterEvents};
+use crate::parser::{ConversationItem, EffortLevel, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
 use futures::StreamExt;
@@ -9,13 +9,14 @@ static BASE_URL: &str = "https://openrouter.ai/api/v1/responses";
 pub async fn get_response(
     model: String,
     input: &Vec<ConversationItem>,
+    effort: Option<&EffortLevel>,
 ) -> Result<Vec<OpenRouterEvents>, String> {
     dotenvy::dotenv().ok();
 
     let api_key =
         env::var("OPENROUTER_API_KEY").map_err(|_| "Must have OPENROUTER_API_KEY".to_string())?;
 
-    let req_body = ResponseRequest::new(model, input);
+    let req_body = ResponseRequest::new(model, input, effort);
 
     let client = reqwest::Client::new();
 
@@ -56,7 +57,7 @@ pub async fn get_response(
                 Ok(event) => event,
                 Err(e) => {
                     eprintln!("failed to parse event: {e}");
-                    eprintln!("raw data: {data}");
+                    eprintln!("failed item raw data: {data}");
                     continue;
                 }
             };
