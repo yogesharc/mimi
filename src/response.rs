@@ -20,14 +20,21 @@ pub async fn get_response(
 
     let client = reqwest::Client::new();
 
-    let mut res = client
+    let response = client
         .post(BASE_URL)
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&req_body)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .bytes_stream();
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        return Err(format!("OpenRouter request failed with {status}: {body}"));
+    }
+
+    let mut res = response.bytes_stream();
 
     let mut events: Vec<OpenRouterEvents> = vec![];
     let mut buffer = String::new();

@@ -3,7 +3,16 @@ use std::collections::HashMap;
 use serde::Serialize;
 use serde_json::Value;
 pub mod file_search;
+pub mod read;
+pub mod shell;
+pub mod write;
 use file_search::Search;
+
+use crate::tools::{
+    read::{def_read_file, read_file},
+    shell::{def_shell, shell},
+    write::{def_write_to_file, write_to_file},
+};
 // =========== Tools Structs and Enums =============
 
 #[derive(Debug, Serialize)]
@@ -27,9 +36,11 @@ struct Parameters {
 pub struct Property {
     r#type: String,
     description: String,
-    // #[serde(rename = "enum")]
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // property_enum: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    items: Option<Box<Property>>,
+    #[serde(rename = "enum")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    property_enum: Option<Vec<String>>,
 }
 
 impl Default for Property {
@@ -37,6 +48,8 @@ impl Default for Property {
         Self {
             r#type: "string".to_string(),
             description: String::new(),
+            items: None,
+            property_enum: None,
         }
     }
 }
@@ -63,64 +76,32 @@ impl ToolDefinition {
     }
 }
 
-// =========== Tools Definition and Functions =============
-
-pub fn get_date(_args: Value) -> Result<Value, String> {
-    //this fn does not use args, its just to kinda half bake the args thing
-    Ok(serde_json::json!({"date": "5 Jul, 2026"}))
-}
-
-pub fn def_get_date() -> ToolDefinition {
-    let name = String::from("get_date");
-    let description = String::from("Get relative date");
-    let strict = true;
-    let mut properties = HashMap::new();
-    let property = Property {
-        r#type: "string".to_string(),
-        description: "Specify names e.g today, yesterday".to_string(),
-    };
-    properties.insert("relative".to_string(), property);
-    let required = Some(vec![String::from("relative")]);
-    ToolDefinition::new(name, description, strict, properties, required)
-}
-
-pub fn get_weather(_args: Value) -> Result<Value, String> {
-    Ok(serde_json::json!("Sunny"))
-}
-
-pub fn def_get_weather() -> ToolDefinition {
-    let name = String::from("get_weather");
-    let description = String::from("Get dummy weather for a place");
-    let strict = true;
-    let mut properties = HashMap::new();
-    let property = Property {
-        r#type: "string".to_string(),
-        description: "Place to get weather for, e.g. Kathmandu".to_string(),
-    };
-    properties.insert("place".to_string(), property);
-    let required = Some(vec![String::from("place")]);
-    ToolDefinition::new(name, description, strict, properties, required)
-}
-
 // =========== System Tools =============
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SystemTools {
-    GetDate,
-    GetWeather,
     SearchFiles,
+    ReadFile,
+    WriteFile,
+    Shell,
 }
 
 impl SystemTools {
     pub fn all() -> Vec<Self> {
-        vec![Self::GetDate, Self::GetWeather, Self::SearchFiles]
+        vec![
+            Self::SearchFiles,
+            Self::ReadFile,
+            Self::WriteFile,
+            Self::Shell,
+        ]
     }
 
     pub fn variant_from_name(name: &str) -> Option<Self> {
         match name {
-            "get_date" => Some(Self::GetDate),
-            "get_weather" => Some(Self::GetWeather),
+            "read_file" => Some(Self::ReadFile),
+            "write_to_file" => Some(Self::WriteFile),
+            "shell" => Some(Self::Shell),
             "search_files" => Some(Self::SearchFiles),
             _ => None,
         }
@@ -128,8 +109,9 @@ impl SystemTools {
 
     pub fn definition(&self) -> ToolDefinition {
         match self {
-            SystemTools::GetDate => def_get_date(),
-            SystemTools::GetWeather => def_get_weather(),
+            SystemTools::ReadFile => def_read_file(),
+            SystemTools::WriteFile => def_write_to_file(),
+            SystemTools::Shell => def_shell(),
             SystemTools::SearchFiles => Search::def_search_files(),
         }
     }
@@ -138,8 +120,9 @@ impl SystemTools {
         let args: Value = serde_json::from_str(arguments).map_err(|e| e.to_string())?;
 
         match self {
-            SystemTools::GetDate => get_date(args),
-            SystemTools::GetWeather => get_weather(args),
+            SystemTools::ReadFile => read_file(args),
+            SystemTools::WriteFile => write_to_file(args),
+            SystemTools::Shell => shell(args),
             SystemTools::SearchFiles => {
                 let search = search.ok_or_else(|| "search state is required".to_string())?;
                 search.search_files(args)
