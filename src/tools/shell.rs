@@ -72,3 +72,28 @@ pub fn def_shell() -> ToolDefinition {
 
     ToolDefinition::new(name, description, strict, properties, required)
 }
+
+#[cfg(test)]
+
+mod test {
+
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn run_shell() {
+        let command = "echo";
+        let arguments = vec!["hello world"];
+        let args = serde_json::to_value(json!({
+            "command": command,
+            "arguments": arguments
+        }))
+        .unwrap();
+
+        let output = shell(args).unwrap();
+        let output = output.get("output").and_then(|c| c.as_str()).unwrap();
+
+        assert_eq!(output.trim(), "hello world")
+    }
+}

@@ -11,13 +11,15 @@ pub fn read_file(path: Value) -> Result<Value, String> {
         .and_then(|p| p.as_str())
         .ok_or_else(|| "missing path".to_string())?;
 
+    println!("PATH: {path}");
+
     let full_path = dir.join(path);
 
-    let contents = fs::read_to_string(full_path).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(full_path).map_err(|e| e.to_string())?;
 
-    println!("READ FILE RESULT: {contents}");
+    println!("READ FILE RESULT: {content}");
 
-    Ok(serde_json::json!({"contents": contents}))
+    Ok(serde_json::json!({"content": content}))
 }
 
 pub fn def_read_file() -> ToolDefinition {
@@ -35,4 +37,20 @@ pub fn def_read_file() -> ToolDefinition {
     let required = Some(vec!["path".to_string()]);
 
     ToolDefinition::new(name, description, strict, properties, required)
+}
+
+#[cfg(test)]
+mod test {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn read_test() {
+        let path = serde_json::to_value(json!({"path": "test/read_this.txt"})).unwrap();
+        let output = read_file(path).unwrap();
+        let content = output.get("content").and_then(|c| c.as_str()).unwrap();
+
+        assert_eq!(content, "hey")
+    }
 }

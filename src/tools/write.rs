@@ -79,3 +79,33 @@ pub fn def_write_to_file() -> ToolDefinition {
     ]);
     ToolDefinition::new(name, description, strict, properties, required)
 }
+
+#[cfg(test)]
+mod test {
+    use serde_json::json;
+
+    use crate::tools::read::read_file;
+
+    use super::*;
+
+    #[test]
+    fn write() {
+        let path = "test/write_here.txt";
+        let content = "hello world";
+        let overwrite = true;
+        let args = serde_json::to_value(json!({
+            "path": path,
+            "content": content,
+            "overwrite": overwrite
+        }))
+        .unwrap();
+
+        let _ = write_to_file(args);
+
+        let path = serde_json::to_value(json!({"path": "test/write_here.txt"})).unwrap();
+        let output = read_file(path).unwrap();
+        let content = output.get("content").and_then(|c| c.as_str()).unwrap();
+
+        assert_eq!(content, "hello world")
+    }
+}
