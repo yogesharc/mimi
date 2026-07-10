@@ -22,7 +22,7 @@ pub struct Reasoning<'a> {
 #[derive(Debug, Serialize)]
 pub struct ResponseRequest<'a> {
     model: String,
-    input: &'a Vec<ConversationItem>,
+    input: &'a Vec<AgentEventItem>,
     stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     tools: Option<Vec<ToolDefinition>>,
@@ -31,9 +31,9 @@ pub struct ResponseRequest<'a> {
     reasoning: Option<Reasoning<'a>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum ConversationItem {
+pub enum AgentEventItem {
     #[serde(rename = "message")]
     Message {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -67,7 +67,7 @@ pub enum ConversationItem {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Content {
     #[serde(rename = "type")]
     content_type: String,
@@ -76,7 +76,7 @@ pub struct Content {
     annotations: Option<Vec<Value>>,
 }
 
-impl ConversationItem {
+impl AgentEventItem {
     pub fn new_user_message(input: String) -> Self {
         let content = Content {
             content_type: "input_text".to_string(),
@@ -96,7 +96,7 @@ impl ConversationItem {
 impl<'a> ResponseRequest<'a> {
     pub fn new(
         model: String,
-        input: &'a Vec<ConversationItem>,
+        input: &'a Vec<AgentEventItem>,
         effort: Option<&'a EffortLevel>,
     ) -> Self {
         let sys_tool_definitions = tools::SystemTools::all()
@@ -117,14 +117,14 @@ impl<'a> ResponseRequest<'a> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     User,
     Assistant,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     InProgress,
@@ -133,7 +133,7 @@ pub enum ResponseStatus {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ResponseCreatedItem {
-    id: String,
+    pub id: String,
     created_at: u64,
     model: String,
     status: ResponseStatus,
@@ -164,7 +164,7 @@ pub enum OpenRouterEvents {
     #[serde(rename = "response.output_item.added")]
     ResponseOutputItemAdded {
         output_index: u64,
-        item: ConversationItem,
+        item: AgentEventItem,
     },
     #[serde(rename = "response.content_part.added")]
     ResponseContentPartAdded {
@@ -205,7 +205,7 @@ pub enum OpenRouterEvents {
     #[serde(rename = "response.output_item.done")]
     ResponseOutputItemDone {
         output_index: u16,
-        item: ConversationItem,
+        item: AgentEventItem,
     },
     #[serde(rename = "response.completed")]
     ResponseCompleted { response: ResponseCompletedItem },

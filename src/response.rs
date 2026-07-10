@@ -1,4 +1,4 @@
-use crate::parser::{ConversationItem, EffortLevel, OpenRouterEvents};
+use crate::parser::{AgentEventItem, EffortLevel, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
 use futures::StreamExt;
@@ -8,7 +8,7 @@ static BASE_URL: &str = "https://openrouter.ai/api/v1/responses";
 
 pub async fn get_response(
     model: String,
-    input: &Vec<ConversationItem>,
+    input: &Vec<AgentEventItem>,
     effort: Option<&EffortLevel>,
 ) -> Result<Vec<OpenRouterEvents>, String> {
     dotenvy::dotenv().ok();

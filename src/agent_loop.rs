@@ -1,14 +1,20 @@
-use super::parser::ConversationItem;
+use uuid::Uuid;
+
+use super::parser::AgentEventItem;
 use super::response::get_response;
 use std::io::{self};
 
 use crate::{
+    events::append_events,
     parser::{EffortLevel, OpenRouterEvents},
     tools::{self, SystemTools},
 };
 
 pub async fn run_loop() -> Result<(), String> {
-    let mut history: Vec<ConversationItem> = Vec::new();
+    let mut event_logs: Vec<AgentEventItem> = Vec::new();
+    let mut tmp_event_logs: Vec<AgentEventItem> = Vec::new();
+    let mut session_id: String = String::new();
+
     let mut search = tools::file_search::Search::default();
     search.index_cwd()?;
 
@@ -19,8 +25,17 @@ pub async fn run_loop() -> Result<(), String> {
             break 'outer;
         }
 
-        let new_msg = ConversationItem::new_user_message(input);
-        history.push(new_msg);
+        let new_msg = AgentEventItem::new_user_message(input);
+
+        if session_id.is_empty() {
+            session_id = Uuid::now_v7().to_string();
+
+            let _create_new_file = append_events(&session_id, &vec![new_msg.clone()], true)
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+
+        event_logs.push(new_msg);
 
         let model = String::from("openai/gpt-5.5");
         let effort = EffortLevel::Medium;
@@ -29,14 +44,16 @@ pub async fn run_loop() -> Result<(), String> {
 
         'agent_loop: loop {
             stop_agent = true;
+            tmp_event_logs = Vec::new();
 
-            let events = get_response(model.clone(), &history, Some(&effort)).await?;
+            let events = get_response(model.clone(), &event_logs, None).await?;
 
             for event in events {
                 match event {
+                    // OpenRouterEvents::ResponseCreated { response } => {}
                     OpenRouterEvents::ResponseOutputItemDone { item, .. } => {
                         match &item {
-                            ConversationItem::ToolCall {
+                            AgentEventItem::ToolCall {
                                 id,
                                 call_id,
                                 name,
@@ -65,29 +82,35 @@ pub async fn run_loop() -> Result<(), String> {
                                 let output =
                                     serde_json::to_string(&output).map_err(|e| e.to_string())?;
 
-                                let tool_call_output = ConversationItem::TollCallOutput {
+                                let tool_call_output = AgentEventItem::TollCallOutput {
                                     id: format!("{}_output", id.clone()),
                                     call_id: call_id.clone(),
                                     output: output,
                                 };
 
-                                history.push(item);
-                                history.push(tool_call_output);
+                                tmp_event_logs.push(item);
+                                tmp_event_logs.push(tool_call_output);
                                 stop_agent = false;
                             }
-                            ConversationItem::Reasoning { summary, .. } => {
+                            AgentEventItem::Reasoning { summary, .. } => {
                                 if !summary.is_empty() {
-                                    history.push(item);
+                                    tmp_event_logs.push(item);
                                 }
                             }
-                            _ => history.push(item),
+                            _ => tmp_event_logs.push(item),
                         };
                     }
                     _ => {}
                 }
             }
             println!("");
-            println!("history: {history:?}");
+            println!("tmp event_logs: {tmp_event_logs:?}");
+
+            let _append_res = append_events(&session_id, &tmp_event_logs, false)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            event_logs.extend(tmp_event_logs);
 
             if stop_agent {
                 break 'agent_loop;
