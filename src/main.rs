@@ -1,5 +1,6 @@
 // mod models;
 mod agent_loop;
+mod context;
 mod events;
 mod parser;
 mod response;

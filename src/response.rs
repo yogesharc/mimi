@@ -10,13 +10,14 @@ pub async fn get_response(
     model: String,
     input: &Vec<AgentEventItem>,
     effort: Option<&EffortLevel>,
+    system_prompt: &Option<String>,
 ) -> Result<Vec<OpenRouterEvents>, String> {
     dotenvy::dotenv().ok();
 
     let api_key =
         env::var("OPENROUTER_API_KEY").map_err(|_| "Must have OPENROUTER_API_KEY".to_string())?;
 
-    let req_body = ResponseRequest::new(model, input, effort);
+    let req_body = ResponseRequest::new(model, input, effort, system_prompt);
 
     let client = reqwest::Client::new();
 

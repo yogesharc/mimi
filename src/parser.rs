@@ -29,6 +29,25 @@ pub struct ResponseRequest<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     tool_choice: Option<String>,
     reasoning: Option<Reasoning<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    instructions: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context_management: Option<Vec<ContextManagement>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ContextManagement {
+    r#type: String,
+    compact_threshold: u64,
+}
+
+impl Default for ContextManagement {
+    fn default() -> Self {
+        Self {
+            r#type: "compaction".to_string(),
+            compact_threshold: 200000,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -98,6 +117,7 @@ impl<'a> ResponseRequest<'a> {
         model: String,
         input: &'a Vec<AgentEventItem>,
         effort: Option<&'a EffortLevel>,
+        system_prompt: &'a Option<String>,
     ) -> Self {
         let sys_tool_definitions = tools::SystemTools::all()
             .iter()
@@ -105,6 +125,7 @@ impl<'a> ResponseRequest<'a> {
             .collect();
 
         let reasoning = effort.map(|eff| Reasoning { effort: eff });
+        let context_management = ContextManagement::default();
 
         ResponseRequest {
             model,
@@ -113,6 +134,8 @@ impl<'a> ResponseRequest<'a> {
             tools: Some(sys_tool_definitions),
             tool_choice: Some("auto".to_string()),
             reasoning,
+            instructions: system_prompt,
+            context_management: Some(vec![context_management]),
         }
     }
 }
@@ -146,11 +169,11 @@ pub struct ResponseCompletedItem {
     usage: Option<Usage>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Usage {
     input_tokens: u64,
     output_tokens: u64,
-    total_tokens: u64,
+    pub total_tokens: u64,
     cost: f64,
 }
 

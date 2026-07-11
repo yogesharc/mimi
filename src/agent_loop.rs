@@ -5,14 +5,17 @@ use super::response::get_response;
 use std::io::{self};
 
 use crate::{
+    context::Context,
     events::append_events,
     parser::{EffortLevel, OpenRouterEvents},
     tools::{self, SystemTools},
 };
 
 pub async fn run_loop() -> Result<(), String> {
-    let mut event_logs: Vec<AgentEventItem> = Vec::new();
-    let mut tmp_event_logs: Vec<AgentEventItem> = Vec::new();
+    let mut context = Context::default();
+    context.build_system_prompt();
+
+    let mut tmp_event_logs: Vec<AgentEventItem> = vec![];
     let mut session_id: String = String::new();
 
     let mut search = tools::file_search::Search::default();
@@ -35,10 +38,14 @@ pub async fn run_loop() -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
         }
 
-        event_logs.push(new_msg);
-
         let model = String::from("openai/gpt-5.5");
         let effort = EffortLevel::Medium;
+
+        let token_usage_status = context
+            .check_token_usage("asd".to_string())
+            .map_err(|e| e.to_string())?;
+
+        context.event_logs.push(new_msg);
 
         let mut stop_agent: bool;
 
@@ -46,7 +53,13 @@ pub async fn run_loop() -> Result<(), String> {
             stop_agent = true;
             tmp_event_logs = Vec::new();
 
-            let events = get_response(model.clone(), &event_logs, None).await?;
+            let events = get_response(
+                model.clone(),
+                &context.event_logs,
+                None,
+                &context.system_prompt,
+            )
+            .await?;
 
             for event in events {
                 match event {
@@ -110,7 +123,7 @@ pub async fn run_loop() -> Result<(), String> {
                 .await
                 .map_err(|e| e.to_string())?;
 
-            event_logs.extend(tmp_event_logs);
+            context.event_logs.extend(tmp_event_logs);
 
             if stop_agent {
                 break 'agent_loop;
