@@ -2,6 +2,7 @@
 mod agent_loop;
 mod context;
 mod events;
+mod models;
 mod parser;
 mod response;
 mod tools;

@@ -1,12 +1,28 @@
 use serde::{self, Serialize};
-mod openai;
+use std::collections::HashMap;
+pub mod openai;
 
 #[derive(Debug, Serialize, strum::Display)]
 #[serde(rename_all = "snake_case")]
 pub enum Providers {
+    #[serde(rename = "openai")]
     OpenAI,
+    #[serde(rename = "anthropic")]
     Anthropic,
+    #[serde(rename = "moonshotai")]
     MoonshotAI,
+}
+
+impl Providers {
+    fn slug(&self) -> String {
+        let slug = match self {
+            Providers::OpenAI => "openai",
+            Providers::Anthropic => "anthropic",
+            Providers::MoonshotAI => "moonshotai",
+        };
+
+        slug.to_string()
+    }
 }
 
 pub enum Modalities {
@@ -23,24 +39,51 @@ pub struct Price {
     output: f64,
 }
 
-pub struct Model<'a> {
-    provider: Providers,
-    identifier: &'a str,
-    name: &'a str,
-    context: u16,
-    input_formats: Vec<Modalities>,
-    output_formats: Vec<Modalities>,
-    reasoning: bool,
-    structured_output: bool,
-    tool_call: bool,
-    streaming: bool,
-    caching: bool,
-    price: Price,
-    updated: &'a str,
+pub struct Model {
+    pub provider: Providers,
+    pub identifier: String,
+    pub name: String,
+    pub context_window: u64,
+    pub input_formats: Vec<Modalities>,
+    pub output_formats: Vec<Modalities>,
+    pub reasoning: bool,
+    pub structured_output: bool,
+    pub tool_call: bool,
+    pub streaming: bool,
+    pub caching: bool,
+    pub price: Price,
+    updated: String,
 }
 
-impl Model<'_> {
-    fn get_identifier(&self) -> String {
+impl Model {
+    pub fn full_identifier(&self) -> String {
         format!("{}/{}", self.provider, self.identifier)
     }
+}
+
+// static MODELS: HashMap<String, Model> = HashMap::new();
+
+pub fn all_models() -> HashMap<String, Model> {
+    let mut models: HashMap<String, Model> = HashMap::new();
+
+    for m in openai::models() {
+        models.insert(m.full_identifier(), m);
+    }
+
+    models
+}
+
+pub fn get_model<'a>(
+    identifier: &str,
+    models: &'a HashMap<String, Model>,
+) -> Result<&'a Model, String> {
+    if identifier.is_empty() {
+        return Err("identifier is required".to_string());
+    };
+
+    let model = models
+        .get(identifier)
+        .ok_or_else(|| "unknown model".to_string());
+
+    model
 }

@@ -1,26 +1,31 @@
 use std::{fs, path::PathBuf};
 
-use crate::parser::{AgentEventItem, Usage};
+use crate::{
+    models::Model,
+    parser::{AgentEventItem, Usage},
+};
 
-pub struct Context {
+pub struct Context<'a> {
     pub event_logs: Vec<AgentEventItem>,
     pub system_prompt: Option<String>,
     pub usage: Usage,
-    pub compact_threshold: u64,
+    pub compact_threshold_percentage: u64,
+    pub model: Option<&'a Model>,
 }
 
-impl Default for Context {
+impl Default for Context<'_> {
     fn default() -> Self {
         Self {
             event_logs: Vec::new(),
             system_prompt: None,
             usage: Usage::default(),
-            compact_threshold: 200000,
+            compact_threshold_percentage: 50,
+            model: None,
         }
     }
 }
 
-impl Context {
+impl Context<'_> {
     pub fn build_system_prompt(&mut self) {
         let mut context: String = String::new();
 
@@ -54,8 +59,17 @@ impl Context {
         let existing_usage = self.usage.total_tokens;
         let upcoming_usage = u64::try_from(new_msg.len()).map_err(|e| e.to_string())?;
 
-        // it should depend on the model context window, will update this later
-        if existing_usage + upcoming_usage > self.compact_threshold {
+        let mut context_window;
+
+        if let Some(model) = &self.model {
+            context_window = model.context_window
+        } else {
+            return Err("No model found".to_string());
+        }
+
+        context_window = self.compact_threshold_percentage / 100 * context_window;
+
+        if existing_usage + upcoming_usage > context_window {
             Err("Usage limit Exceed".to_string())
         } else {
             Ok(())

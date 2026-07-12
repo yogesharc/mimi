@@ -7,6 +7,7 @@ use std::io::{self};
 use crate::{
     context::Context,
     events::append_events,
+    models::{Model, all_models, get_model},
     parser::{EffortLevel, OpenRouterEvents},
     tools::{self, SystemTools},
 };
@@ -18,6 +19,11 @@ pub async fn run_loop() -> Result<(), String> {
     let mut tmp_event_logs: Vec<AgentEventItem> = vec![];
     let mut session_id: String = String::new();
 
+    let available_models = all_models();
+    let default_model_str = String::from("openai/gpt-5.5");
+    let default_model = get_model(&default_model_str, &available_models)?;
+    context.model = Some(default_model);
+
     let mut search = tools::file_search::Search::default();
     search.index_cwd()?;
 
@@ -28,7 +34,7 @@ pub async fn run_loop() -> Result<(), String> {
             break 'outer;
         }
 
-        let new_msg = AgentEventItem::new_user_message(input);
+        let new_msg = AgentEventItem::new_user_message(input.clone());
 
         if session_id.is_empty() {
             session_id = Uuid::now_v7().to_string();
@@ -38,11 +44,16 @@ pub async fn run_loop() -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
         }
 
-        let model = String::from("openai/gpt-5.5");
+        // let selected_model_str = String::from("openai/gpt-5.5");
+
+        // let selected_model =
+        //     get_model(&selected_model_str, &available_models).map_err(|e| e.to_string())?;
+        // context.model = Some(selected_model);
+
         let effort = EffortLevel::Medium;
 
         let token_usage_status = context
-            .check_token_usage("asd".to_string())
+            .check_token_usage(input)
             .map_err(|e| e.to_string())?;
 
         context.event_logs.push(new_msg);
@@ -54,7 +65,7 @@ pub async fn run_loop() -> Result<(), String> {
             tmp_event_logs = Vec::new();
 
             let events = get_response(
-                model.clone(),
+                context.model.unwrap().full_identifier(),
                 &context.event_logs,
                 None,
                 &context.system_prompt,
