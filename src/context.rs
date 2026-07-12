@@ -19,7 +19,7 @@ impl Default for Context<'_> {
             event_logs: Vec::new(),
             system_prompt: None,
             usage: Usage::default(),
-            compact_threshold_percentage: 50,
+            compact_threshold_percentage: 10,
             model: None,
         }
     }
@@ -30,7 +30,8 @@ impl Context<'_> {
         let mut context: String = String::new();
 
         let system_prompt_path = PathBuf::from("src/prompts/codex_opencode.txt");
-        let system_prompt = fs::read_to_string(system_prompt_path);
+        // let system_prompt = fs::read_to_string(system_prompt_path);
+        let system_prompt: Result<String, String> = Ok(String::new());
 
         match system_prompt {
             Ok(v) => context.push_str(&v),
@@ -76,7 +77,7 @@ impl Context<'_> {
 
         println!("useable_context_window: {useable_context_window}");
 
-        if existing_usage + upcoming_usage > useable_context_window {
+        if existing_usage + upcoming_usage > context_window {
             Err("Usage limit Exceed".to_string())
         } else {
             Ok(())

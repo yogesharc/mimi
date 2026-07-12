@@ -1,4 +1,4 @@
-use crate::parser::{AgentEventItem, EffortLevel, OpenRouterEvents};
+use crate::parser::{AgentEventItem, ContextManagement, EffortLevel, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
 use futures::StreamExt;
@@ -11,13 +11,14 @@ pub async fn get_response(
     input: &Vec<AgentEventItem>,
     effort: Option<&EffortLevel>,
     system_prompt: &Option<String>,
+    context_management: &Option<Vec<ContextManagement>>,
 ) -> Result<Vec<OpenRouterEvents>, String> {
     dotenvy::dotenv().ok();
 
     let api_key =
         env::var("OPENROUTER_API_KEY").map_err(|_| "Must have OPENROUTER_API_KEY".to_string())?;
 
-    let req_body = ResponseRequest::new(model, input, effort, system_prompt);
+    let req_body = ResponseRequest::new(model, input, effort, system_prompt, context_management);
 
     let client = reqwest::Client::new();
 
