@@ -3,13 +3,10 @@ use std::collections::HashMap;
 pub mod openai;
 
 #[derive(Debug, Serialize, strum::Display)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum Providers {
-    #[serde(rename = "openai")]
     OpenAI,
-    #[serde(rename = "anthropic")]
     Anthropic,
-    #[serde(rename = "moonshotai")]
     MoonshotAI,
 }
 
@@ -57,7 +54,7 @@ pub struct Model {
 
 impl Model {
     pub fn full_identifier(&self) -> String {
-        format!("{}/{}", self.provider, self.identifier)
+        format!("{}/{}", self.provider.slug(), self.identifier)
     }
 }
 

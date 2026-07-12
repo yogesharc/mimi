@@ -20,7 +20,7 @@ pub async fn run_loop() -> Result<(), String> {
     let mut session_id: String = String::new();
 
     let available_models = all_models();
-    let default_model_str = String::from("openai/gpt-5.5");
+    let default_model_str = String::from("openai/gpt-5.6-sol");
     let default_model = get_model(&default_model_str, &available_models)?;
     context.model = Some(default_model);
 
