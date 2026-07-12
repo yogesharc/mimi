@@ -57,19 +57,26 @@ impl Context<'_> {
 
     pub fn check_token_usage(&self, new_msg: String) -> Result<(), String> {
         let existing_usage = self.usage.total_tokens;
-        let upcoming_usage = u64::try_from(new_msg.len()).map_err(|e| e.to_string())?;
+        let upcoming_usage = u64::try_from(new_msg.len() * 4).map_err(|e| e.to_string())?;
 
-        let mut context_window;
+        println!("existing_usage: {existing_usage}");
+        println!("upcoming_usage: {upcoming_usage}");
 
-        if let Some(model) = &self.model {
+        let context_window;
+
+        if let Some(model) = self.model {
             context_window = model.context_window
         } else {
             return Err("No model found".to_string());
         }
 
-        context_window = self.compact_threshold_percentage / 100 * context_window;
+        println!("context_window: {context_window}");
 
-        if existing_usage + upcoming_usage > context_window {
+        let useable_context_window = self.compact_threshold_percentage * context_window / 100;
+
+        println!("useable_context_window: {useable_context_window}");
+
+        if existing_usage + upcoming_usage > useable_context_window {
             Err("Usage limit Exceed".to_string())
         } else {
             Ok(())
