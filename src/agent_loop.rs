@@ -7,8 +7,8 @@ use std::io::{self};
 use crate::{
     context::Context,
     events::append_events,
-    models::{Model, all_models, get_model},
-    parser::{EffortLevel, OpenRouterEvents},
+    models::{all_models, get_model},
+    parser::{EffortLevel, OpenRouterEvents, Usage},
     tools::{self, SystemTools},
 };
 
@@ -50,9 +50,9 @@ pub async fn run_loop() -> Result<(), String> {
         //     get_model(&selected_model_str, &available_models).map_err(|e| e.to_string())?;
         // context.model = Some(selected_model);
 
-        let effort = EffortLevel::Medium;
+        let _effort = EffortLevel::Medium;
 
-        let token_usage_status = context
+        let _token_usage_status = context
             .check_token_usage(input)
             .map_err(|e| e.to_string())?;
 
@@ -123,6 +123,14 @@ pub async fn run_loop() -> Result<(), String> {
                             }
                             _ => tmp_event_logs.push(item),
                         };
+                    }
+                    OpenRouterEvents::ResponseCompleted { response } => {
+                        if let Some(new_usage) = response.usage {
+                            context.usage.input_tokens += new_usage.input_tokens;
+                            context.usage.output_tokens += new_usage.output_tokens;
+                            context.usage.total_tokens += new_usage.total_tokens;
+                            context.usage.cost += new_usage.cost;
+                        }
                     }
                     _ => {}
                 }

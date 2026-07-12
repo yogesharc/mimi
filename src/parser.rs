@@ -166,15 +166,17 @@ pub struct ResponseCreatedItem {
 pub struct ResponseCompletedItem {
     id: String,
     completed_at: u64,
-    usage: Option<Usage>,
+    pub usage: Option<Usage>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Usage {
-    input_tokens: u64,
-    output_tokens: u64,
+    pub input_tokens: u64,
+    // pub cached_input_tokens: u64,
+    pub output_tokens: u64,
+    // pub reasoning_tokens: u64,
     pub total_tokens: u64,
-    cost: f64,
+    pub cost: f64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
