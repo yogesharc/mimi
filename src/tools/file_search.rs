@@ -176,6 +176,8 @@ impl Search {
             regex_fallback_error: grep_results.regex_fallback_error,
         };
 
+        // println!("CONTENT SEARCH RESULT: {results:?}");
+
         Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
     }
 

@@ -50,7 +50,7 @@ pub async fn get_response(
             let line = buffer[..newline_index].trim().to_string();
             buffer = buffer[newline_index + 1..].to_string();
 
-            println!("{line}");
+            // println!("{line}");
 
             if !line.starts_with("data:") {
                 continue;
