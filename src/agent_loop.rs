@@ -43,13 +43,17 @@ pub async fn run_loop() -> Result<(), String> {
 
         let new_msg = AgentEventItem::new_user_message(input.clone());
 
-        if session_id.is_empty() {
-            session_id = Uuid::now_v7().to_string();
+        let is_new_session = match session_id.is_empty() {
+            true => {
+                session_id = Uuid::now_v7().to_string();
+                true
+            }
+            false => false,
+        };
 
-            let _create_new_file = append_events(&session_id, &vec![new_msg.clone()], true)
-                .await
-                .map_err(|e| e.to_string())?;
-        }
+        let _create_new_file = append_events(&session_id, &vec![new_msg.clone()], is_new_session)
+            .await
+            .map_err(|e| e.to_string())?;
 
         // let selected_model_str = String::from("openai/gpt-5.5");
 
@@ -116,7 +120,7 @@ pub async fn run_loop() -> Result<(), String> {
                                 let output =
                                     serde_json::to_string(&output).map_err(|e| e.to_string())?;
 
-                                let tool_call_output = AgentEventItem::TollCallOutput {
+                                let tool_call_output = AgentEventItem::ToolCallOutput {
                                     id: format!("{}_output", id.clone()),
                                     call_id: call_id.clone(),
                                     output: output,

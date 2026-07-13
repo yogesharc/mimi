@@ -58,7 +58,7 @@ impl Context<'_> {
 
     pub fn check_token_usage(&self, new_msg: String) -> Result<(), String> {
         let existing_usage = self.usage.total_tokens;
-        let upcoming_usage = u64::try_from(new_msg.len() * 4).map_err(|e| e.to_string())?;
+        let upcoming_usage = u64::try_from(new_msg.len() / 4).map_err(|e| e.to_string())?;
 
         println!("existing_usage: {existing_usage}");
         println!("upcoming_usage: {upcoming_usage}");

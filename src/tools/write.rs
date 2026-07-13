@@ -12,7 +12,7 @@ use uuid::Uuid;
 #[derive(Deserialize)]
 struct WriteArgs {
     path: String,
-    truncate: bool,
+    overwrite: bool,
     content: String,
 }
 
@@ -28,7 +28,7 @@ pub fn write_to_file(args: Value) -> Result<Value, String> {
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
-        .truncate(parsed_args.truncate)
+        .truncate(parsed_args.overwrite)
         .open(path)
         .map_err(|e| e.to_string())?;
 
@@ -109,7 +109,7 @@ mod test {
         }))
         .unwrap();
 
-        let _ = write_to_file(args);
+        write_to_file(args).unwrap();
 
         let path = serde_json::to_value(json!({"path": "test/write_here.txt"})).unwrap();
         let output = read_file(path).unwrap();

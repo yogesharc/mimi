@@ -79,7 +79,7 @@ pub enum AgentEventItem {
         arguments: String,
     },
     #[serde(rename = "function_call_output")]
-    TollCallOutput {
+    ToolCallOutput {
         id: String,
         call_id: String,
         output: String,
