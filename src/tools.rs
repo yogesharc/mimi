@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use serde_json::Value;
+pub mod edit;
 pub mod file_search;
 pub mod read;
 pub mod shell;

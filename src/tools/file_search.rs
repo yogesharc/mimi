@@ -162,6 +162,8 @@ impl Search {
                     line_number: m.line_number,
                     col: m.col,
                     line_content: m.line_content.clone(),
+                    context_before: m.context_before.clone(),
+                    context_after: m.context_after.clone(),
                 })
             })
             .collect();
@@ -252,6 +254,8 @@ struct ContentMatch {
     line_number: u64,
     col: usize,
     line_content: String,
+    context_before: Vec<String>,
+    context_after: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

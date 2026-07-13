@@ -1,45 +1,38 @@
+use crate::tools::{Property, ToolDefinition};
+use serde::Deserialize;
+use serde_json::Value;
 use std::{
     collections::HashMap,
     fs::{self, OpenOptions},
     io::Write,
     path::Path,
 };
-
-use serde_json::Value;
 use uuid::Uuid;
 
-use crate::tools::{Property, ToolDefinition};
+#[derive(Deserialize)]
+struct WriteArgs {
+    path: String,
+    truncate: bool,
+    content: String,
+}
 
 pub fn write_to_file(args: Value) -> Result<Value, String> {
-    let path_str = args
-        .get("path")
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "missing path to write file".to_string())?;
+    let parsed_args = serde_json::from_value::<WriteArgs>(args).map_err(|e| e.to_string())?;
 
-    let path = Path::new(path_str);
+    let path = Path::new(&parsed_args.path);
 
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
-    let truncate = args
-        .get("overwrite")
-        .and_then(|c| c.as_bool())
-        .ok_or_else(|| "missing whether to overwrite or not".to_string())?;
-
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
-        .truncate(truncate)
+        .truncate(parsed_args.truncate)
         .open(path)
         .map_err(|e| e.to_string())?;
 
-    let contents = args
-        .get("content")
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "missing content".to_string())?;
-
-    file.write_all(contents.as_bytes())
+    file.write_all(parsed_args.content.as_bytes())
         .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"success:": "ok"}))
