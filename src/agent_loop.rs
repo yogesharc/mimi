@@ -97,7 +97,9 @@ pub async fn run_loop() -> Result<(), String> {
                                 };
 
                                 let search_struct = match &tool {
-                                    SystemTools::SearchFiles => Some(&search),
+                                    SystemTools::SearchFiles | SystemTools::SearchContent => {
+                                        Some(&search)
+                                    }
                                     _ => None,
                                 };
 

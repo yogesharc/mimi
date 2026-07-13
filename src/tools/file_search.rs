@@ -1,9 +1,8 @@
-// use crate::tools;
 use crate::tools::{Property, ToolDefinition};
 use fff_search::{
-    FFFMode, FilePickerOptions, FrecencyTracker, FuzzySearchOptions, Location, PaginationArgs,
-    QueryParser, QueryTracker, SharedFilePicker, SharedFrecency, SharedQueryTracker,
-    file_picker::FilePicker,
+    FFFMode, FilePickerOptions, FrecencyTracker, FuzzySearchOptions, GrepMode, GrepSearchOptions,
+    Location, PaginationArgs, QueryParser, QueryTracker, SharedFilePicker, SharedFrecency,
+    SharedQueryTracker, file_picker::FilePicker, parse_grep_query,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -114,22 +113,116 @@ impl Search {
             location: search_results.location.map(Loc::from),
         };
 
-        // println!("Search Result: {results:?}");
+        Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
+    }
+
+    pub fn search_content(&self, search_query: Value) -> Result<Value, String> {
+        let picker_guard = self.shared_picker.read().map_err(|e| e.to_string())?;
+        let picker = picker_guard
+            .as_ref()
+            .ok_or_else(|| "search index has not been initialized".to_string())?;
+
+        let query_str = search_query
+            .get("query")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "missing query".to_string())?;
+
+        let mode = match search_query
+            .get("mode")
+            .and_then(|v| v.as_str())
+            .unwrap_or("plain")
+        {
+            "regex" => GrepMode::Regex,
+            "fuzzy" => GrepMode::Fuzzy,
+            _ => GrepMode::PlainText,
+        };
+
+        let query = parse_grep_query(query_str);
+        let grep_results = picker.grep(
+            &query,
+            &GrepSearchOptions {
+                mode,
+                smart_case: true,
+                page_limit: 50,
+                max_matches_per_file: 20,
+                before_context: 0,
+                after_context: 0,
+                trim_whitespace: true,
+                ..Default::default()
+            },
+        );
+
+        let matches: Vec<ContentMatch> = grep_results
+            .matches
+            .iter()
+            .filter_map(|m| {
+                let file = grep_results.files.get(m.file_index)?;
+                Some(ContentMatch {
+                    path: file.relative_path(picker),
+                    line_number: m.line_number,
+                    col: m.col,
+                    line_content: m.line_content.clone(),
+                })
+            })
+            .collect();
+
+        let results = ContentSearchResult {
+            query: query_str.to_string(),
+            matches,
+            files_with_matches: grep_results.files_with_matches,
+            total_files_searched: grep_results.total_files_searched,
+            regex_fallback_error: grep_results.regex_fallback_error,
+        };
 
         Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
     }
 
     pub fn def_search_files() -> ToolDefinition {
         let name = "search_files".to_string();
-        let description = "Performs fuzzy search with frecency-weighted scoring".to_string();
+        let description =
+            "Fuzzy-search for files by name/path (not file contents). Use search_content to find text inside files."
+                .to_string();
         let strict = true;
 
         let mut properties = HashMap::new();
         let mut query_property = Property::default();
-        query_property.description = "Provide a query to search".to_string();
+        query_property.description =
+            "Filename or path fragment to fuzzy-match (e.g. 'agent_loop', 'src/tools')".to_string();
         properties.insert("query".to_string(), query_property);
 
         let required = Some(vec![String::from("query")]);
+
+        ToolDefinition::new(name, description, strict, properties, required)
+    }
+
+    pub fn def_search_content() -> ToolDefinition {
+        let name = "search_content".to_string();
+        let description =
+            "Search for text/keywords inside file contents (grep). Supports constraints like '*.rs keyword'. Use this when looking for code, symbols, or strings — not filenames."
+                .to_string();
+        let strict = true;
+
+        let mut query_property = Property::default();
+        query_property.description =
+            "Text/keyword/regex to find inside files. Optional path filters: '*.rs fn main', 'TODO'."
+                .to_string();
+
+        let mode_property = Property {
+            description: "Search mode: 'plain' (literal, default), 'regex', or 'fuzzy'".to_string(),
+            property_enum: Some(vec![
+                "plain".to_string(),
+                "regex".to_string(),
+                "fuzzy".to_string(),
+            ]),
+            ..Default::default()
+        };
+
+        let properties = HashMap::from([
+            ("query".to_string(), query_property),
+            ("mode".to_string(), mode_property),
+        ]);
+
+        let required = Some(vec![String::from("query"), String::from("mode")]);
 
         ToolDefinition::new(name, description, strict, properties, required)
     }
@@ -141,6 +234,24 @@ struct SearchResult {
     paths: Vec<String>,
     total_matched: usize,
     location: Option<Loc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ContentSearchResult {
+    query: String,
+    matches: Vec<ContentMatch>,
+    files_with_matches: usize,
+    total_files_searched: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    regex_fallback_error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ContentMatch {
+    path: String,
+    line_number: u64,
+    col: usize,
+    line_content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

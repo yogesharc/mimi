@@ -6,6 +6,7 @@ use std::{
 };
 
 use serde_json::Value;
+use uuid::Uuid;
 
 use crate::tools::{Property, ToolDefinition};
 
@@ -42,6 +43,21 @@ pub fn write_to_file(args: Value) -> Result<Value, String> {
         .map_err(|e| e.to_string())?;
 
     Ok(serde_json::json!({"success:": "ok"}))
+}
+
+pub fn make_a_copy(path: &str) -> Result<(), String> {
+    let id = Uuid::now_v7();
+    let to = format!("{id}-{path}");
+
+    fs::copy(path, to).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+pub fn delete_file(path: &str) -> Result<(), String> {
+    fs::remove_file(path).map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 pub fn def_write_to_file() -> ToolDefinition {

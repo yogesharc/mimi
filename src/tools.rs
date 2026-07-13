@@ -82,6 +82,7 @@ impl ToolDefinition {
 #[serde(rename_all = "snake_case")]
 pub enum SystemTools {
     SearchFiles,
+    SearchContent,
     ReadFile,
     WriteFile,
     Shell,
@@ -91,6 +92,7 @@ impl SystemTools {
     pub fn all() -> Vec<Self> {
         vec![
             Self::SearchFiles,
+            Self::SearchContent,
             Self::ReadFile,
             Self::WriteFile,
             Self::Shell,
@@ -103,6 +105,7 @@ impl SystemTools {
             "write_to_file" => Some(Self::WriteFile),
             "shell" => Some(Self::Shell),
             "search_files" => Some(Self::SearchFiles),
+            "search_content" => Some(Self::SearchContent),
             _ => None,
         }
     }
@@ -113,6 +116,7 @@ impl SystemTools {
             SystemTools::WriteFile => def_write_to_file(),
             SystemTools::Shell => def_shell(),
             SystemTools::SearchFiles => Search::def_search_files(),
+            SystemTools::SearchContent => Search::def_search_content(),
         }
     }
 
@@ -126,6 +130,10 @@ impl SystemTools {
             SystemTools::SearchFiles => {
                 let search = search.ok_or_else(|| "search state is required".to_string())?;
                 search.search_files(args)
+            }
+            SystemTools::SearchContent => {
+                let search = search.ok_or_else(|| "search state is required".to_string())?;
+                search.search_content(args)
             }
         }
     }
