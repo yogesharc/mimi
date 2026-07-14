@@ -1,16 +1,16 @@
 use crate::parser::AgentEventItem;
 
 use anyhow::{Context, Result, bail};
-
-use std::{
-    fs::{self, OpenOptions},
-    io::{BufWriter, Write},
-    path::PathBuf,
+use tokio::{
+    fs,
+    io::{AsyncWriteExt, BufWriter},
 };
+
+use std::path::PathBuf;
 
 // static APP_PATH: &str = ".mimi";
 
-fn get_app_dir() -> Result<PathBuf> {
+async fn get_app_dir() -> Result<PathBuf> {
     let app_dir;
 
     if let Some(dir) = std::env::var_os("HOME") {
@@ -20,6 +20,7 @@ fn get_app_dir() -> Result<PathBuf> {
     }
 
     fs::create_dir_all(&app_dir)
+        .await
         .with_context(|| format!("failed to create app directory {}", app_dir.display()))?;
 
     Ok(app_dir)
@@ -34,9 +35,9 @@ pub async fn append_events(
         bail!("session ID is required");
     }
 
-    let sessions_dir = get_app_dir()?.join("sessions");
+    let sessions_dir = get_app_dir().await?.join("sessions");
 
-    fs::create_dir_all(&sessions_dir).with_context(|| {
+    fs::create_dir_all(&sessions_dir).await.with_context(|| {
         format!(
             "failed to create sessions directory {}",
             sessions_dir.display()
@@ -46,23 +47,29 @@ pub async fn append_events(
     let file_name = format!("{session_id}.jsonl");
     let path = sessions_dir.join(file_name);
 
-    let file = OpenOptions::new()
+    let file = fs::OpenOptions::new()
         .create_new(create_new)
         .append(true)
         .open(&path)
+        .await
         .with_context(|| format!("failed to open session log {}", path.display()))?;
 
     let mut writer = BufWriter::new(file);
 
     for item in events {
-        let json =
+        let mut json =
             serde_json::to_string_pretty(&item).context("failed to serialize session event")?;
-        writeln!(writer, "{json}")
+        json.push('\n');
+
+        writer
+            .write_all(json.as_bytes())
+            .await
             .with_context(|| format!("failed to write session log {}", path.display()))?;
     }
 
     writer
         .flush()
+        .await
         .with_context(|| format!("failed to flush session log {}", path.display()))?;
 
     Ok(())
