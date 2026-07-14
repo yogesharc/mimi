@@ -11,13 +11,13 @@ pub fn read_file(path: Value) -> Result<Value, String> {
         .and_then(|p| p.as_str())
         .ok_or_else(|| "missing path".to_string())?;
 
-    println!("PATH: {path}");
+    // println!("PATH: {path}");
 
     let full_path = dir.join(path);
 
     let content = fs::read_to_string(full_path).map_err(|e| e.to_string())?;
 
-    println!("READ FILE RESULT: {content}");
+    // println!("READ FILE RESULT: {content}");
 
     Ok(serde_json::json!({"content": content}))
 }

@@ -2,7 +2,10 @@ use uuid::Uuid;
 
 use super::parser::AgentEventItem;
 use super::response::get_response;
-use std::io::{self};
+use std::{
+    io::{self},
+    time::Instant,
+};
 
 use crate::{
     context::Context,
@@ -13,6 +16,7 @@ use crate::{
 };
 
 pub async fn run_loop() -> Result<(), String> {
+    let initialize = Instant::now();
     let mut context = Context::default();
     context.build_system_prompt();
 
@@ -33,6 +37,8 @@ pub async fn run_loop() -> Result<(), String> {
 
     let mut search = tools::file_search::Search::default();
     search.index_cwd()?;
+
+    println!("PROGRAM INITIALIZED: {:?}", initialize.elapsed());
 
     'outer: loop {
         let input = ask_input();
@@ -70,6 +76,7 @@ pub async fn run_loop() -> Result<(), String> {
         context.event_logs.push(new_msg);
 
         let mut stop_agent: bool;
+        let response_time = Instant::now();
 
         'agent_loop: loop {
             stop_agent = true;
@@ -159,6 +166,7 @@ pub async fn run_loop() -> Result<(), String> {
             context.event_logs.extend(tmp_event_logs);
 
             if stop_agent {
+                println!("RESPONSE TIME: {:?}", response_time.elapsed());
                 break 'agent_loop;
             }
         }
