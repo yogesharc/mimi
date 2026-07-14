@@ -13,7 +13,7 @@ use crate::{
     context::Context,
     events::append_events,
     models::{all_models, get_model},
-    parser::{ContextManagement, EffortLevel, OpenRouterEvents},
+    parser::{EffortLevel, OpenRouterEvents},
     tools::{self, SystemTools},
 };
 
@@ -33,12 +33,12 @@ pub async fn run_loop() -> Result<()> {
     let default_model = get_model(&default_model_str, &available_models)?;
     context.model = Some(default_model);
 
-    let context_management = Some(vec![ContextManagement {
-        compact_threshold: context.compact_threshold_percentage
-            * context.model.unwrap().context_window
-            / 100,
-        ..Default::default()
-    }]);
+    // let context_management = Some(vec![ContextManagement {
+    //     compact_threshold: context.compact_threshold_percentage
+    //         * context.model.unwrap().context_window
+    //         / 100,
+    //     ..Default::default()
+    // }]);
 
     let mut search = tools::file_search::Search::default();
     search.index_cwd()?;
@@ -120,7 +120,7 @@ pub async fn run_loop() -> Result<()> {
                 &context.event_logs,
                 None,
                 &context.system_prompt,
-                &context_management,
+                &None, // &context_management,
             )
             .await?;
 
