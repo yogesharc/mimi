@@ -29,7 +29,7 @@ impl Context<'_> {
     pub fn build_system_prompt(&mut self) {
         let mut context: String = String::new();
 
-        let system_prompt_path = PathBuf::from("src/prompts/codex_opencode.txt");
+        // let system_prompt_path = PathBuf::from("src/prompts/codex_opencode.txt");
         // let system_prompt = fs::read_to_string(system_prompt_path);
         let system_prompt: Result<String, String> = Ok(String::new());
 

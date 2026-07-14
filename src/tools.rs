@@ -5,14 +5,14 @@ use serde_json::Value;
 pub mod edit;
 pub mod file_search;
 pub mod read;
-pub mod shell;
+pub mod bash;
 pub mod write;
 use file_search::Search;
 
 use crate::tools::{
+    bash::{bash, def_bash},
     edit::{def_edit_file, edit_file},
     read::{def_read_file, read_file},
-    shell::{def_shell, shell},
     write::{def_write_to_file, write_to_file},
 };
 // =========== Tools Structs and Enums =============
@@ -88,7 +88,7 @@ pub enum SystemTools {
     ReadFile,
     WriteFile,
     EditFile,
-    Shell,
+    Bash,
 }
 
 impl SystemTools {
@@ -99,7 +99,7 @@ impl SystemTools {
             Self::ReadFile,
             Self::WriteFile,
             Self::EditFile,
-            Self::Shell,
+            Self::Bash,
         ]
     }
 
@@ -108,7 +108,7 @@ impl SystemTools {
             "read_file" => Some(Self::ReadFile),
             "write_to_file" => Some(Self::WriteFile),
             "edit_file" => Some(Self::EditFile),
-            "shell" => Some(Self::Shell),
+            "bash" => Some(Self::Bash),
             "search_files" => Some(Self::SearchFiles),
             "search_content" => Some(Self::SearchContent),
             _ => None,
@@ -120,7 +120,7 @@ impl SystemTools {
             SystemTools::ReadFile => def_read_file(),
             SystemTools::WriteFile => def_write_to_file(),
             SystemTools::EditFile => def_edit_file(),
-            SystemTools::Shell => def_shell(),
+            SystemTools::Bash => def_bash(),
             SystemTools::SearchFiles => Search::def_search_files(),
             SystemTools::SearchContent => Search::def_search_content(),
         }
@@ -133,7 +133,7 @@ impl SystemTools {
             SystemTools::ReadFile => read_file(args),
             SystemTools::WriteFile => write_to_file(args),
             SystemTools::EditFile => edit_file(args).map_err(|e| e.to_string()),
-            SystemTools::Shell => shell(args),
+            SystemTools::Bash => bash(args).map_err(|e| e.to_string()),
             SystemTools::SearchFiles => {
                 let search = search.ok_or_else(|| "search state is required".to_string())?;
                 search.search_files(args)
