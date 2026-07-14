@@ -3,7 +3,7 @@ use uuid::Uuid;
 use super::parser::AgentEventItem;
 use super::response::get_response;
 use std::{
-    io::{self},
+    io::{self, Write},
     time::Instant,
 };
 
@@ -176,6 +176,8 @@ pub async fn run_loop() -> Result<(), String> {
 }
 
 fn ask_input() -> String {
+    let _ = io::stdout().flush();
+
     let mut input = String::new();
     println!("Ask anything:");
 

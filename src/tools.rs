@@ -2,14 +2,16 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use serde_json::Value;
+pub mod approval;
+pub mod bash;
 pub mod edit;
 pub mod file_search;
 pub mod read;
-pub mod bash;
 pub mod write;
 use file_search::Search;
 
 use crate::tools::{
+    approval::approve_tool,
     bash::{bash, def_bash},
     edit::{def_edit_file, edit_file},
     read::{def_read_file, read_file},
@@ -131,9 +133,65 @@ impl SystemTools {
 
         match self {
             SystemTools::ReadFile => read_file(args),
-            SystemTools::WriteFile => write_to_file(args),
-            SystemTools::EditFile => edit_file(args).map_err(|e| e.to_string()),
-            SystemTools::Bash => bash(args).map_err(|e| e.to_string()),
+            SystemTools::WriteFile => {
+                let overwrite = args
+                    .get("overwrite")
+                    .and_then(|v| v.as_bool())
+                    .ok_or_else(|| "overwrite is missing")
+                    .map_err(|e| e.to_string())?;
+                let mut approved = true;
+                let path;
+
+                if overwrite {
+                    path = args
+                        .get("path")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| "path is missing")
+                        .map_err(|e| e.to_string())?;
+
+                    println!("ASKING APPROVAL -- WRITE -- {path}");
+
+                    approved = approve_tool();
+                }
+                if approved {
+                    write_to_file(args)
+                } else {
+                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                }
+            }
+            SystemTools::EditFile => {
+                let path = args
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "path is missing")
+                    .map_err(|e| e.to_string())?;
+
+                println!("ASKING APPROVAL -- EDIT -- {path}");
+
+                let approved = approve_tool();
+
+                if approved {
+                    edit_file(args).map_err(|e| e.to_string())
+                } else {
+                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                }
+            }
+            SystemTools::Bash => {
+                let cmd = args
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "command is missing")
+                    .map_err(|e| e.to_string())?;
+
+                println!("ASKING APPROVAL: {cmd}");
+                let approved = approve_tool();
+
+                if approved {
+                    bash(args).map_err(|e| e.to_string())
+                } else {
+                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                }
+            }
             SystemTools::SearchFiles => {
                 let search = search.ok_or_else(|| "search state is required".to_string())?;
                 search.search_files(args)
