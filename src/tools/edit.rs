@@ -7,7 +7,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 use crate::tools::{Property, ToolDefinition};
 
@@ -23,23 +23,34 @@ struct Edit {
 enum EditType {
     Replace,
     Delete,
-    // Append,
+    Append,
 }
 
 pub fn edit_file(args: Value) -> Result<Value> {
     let edit = serde_json::from_value::<Edit>(args)?;
     let path = Path::new(&edit.path);
 
-    let content = read_to_string(path)?;
+    let mut content = read_to_string(path)?;
 
     match edit.r#type {
         EditType::Replace | EditType::Delete => {
             let old_content = edit.old_content.as_deref().unwrap_or("");
             let new_content = edit.new_content.as_deref().unwrap_or("");
 
-            let updated_content = content.replacen(&old_content, &new_content, 1);
+            let updated_content = content.replacen(old_content, new_content, 1);
 
             fs::write(path, updated_content)?;
+        }
+        EditType::Append => {
+            let old_content = edit.old_content.as_deref().unwrap_or("");
+            let new_content = edit.new_content.as_deref().unwrap_or("");
+
+            let Some(idx) = content.find(old_content) else {
+                bail!("old_content not found in file");
+            };
+            content.insert_str(idx + old_content.len(), new_content);
+
+            fs::write(path, content)?;
         }
     }
 
@@ -48,7 +59,7 @@ pub fn edit_file(args: Value) -> Result<Value> {
 
 pub fn def_edit_file() -> ToolDefinition {
     let name = "edit_file".to_string();
-    let description = "Find and replace or delete content in a file".to_string();
+    let description = "Find and replace, delete, or append content in a file".to_string();
     let strict = true;
 
     let path_property = Property {
@@ -57,19 +68,26 @@ pub fn def_edit_file() -> ToolDefinition {
     };
 
     let type_property = Property {
-        description: "Edit operation: 'Replace' to substitute text, 'Delete' to remove text"
-            .to_string(),
-        property_enum: Some(vec!["Replace".to_string(), "Delete".to_string()]),
+        description:
+            "Edit operation: 'Replace' to substitute text, 'Delete' to remove text, 'Append' to insert after a match"
+                .to_string(),
+        property_enum: Some(vec![
+            "Replace".to_string(),
+            "Delete".to_string(),
+            "Append".to_string(),
+        ]),
         ..Default::default()
     };
 
     let old_content_property = Property {
-        description: "The existing content to find in the file".to_string(),
+        description:
+            "Existing text to locate in the file. For Append, new_content is inserted after this match"
+                .to_string(),
         ..Default::default()
     };
 
     let new_content_property = Property {
-        description: "The replacement content (used with Replace; empty string for Delete)"
+        description: "Replacement or appended text (Replace/Append). Use empty string for Delete"
             .to_string(),
         ..Default::default()
     };
