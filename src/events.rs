@@ -1,5 +1,7 @@
 use crate::parser::AgentEventItem;
 
+use anyhow::{Context, Result, bail};
+
 use std::{
     fs::{self, OpenOptions},
     io::{BufWriter, Write},
@@ -8,16 +10,17 @@ use std::{
 
 // static APP_PATH: &str = ".mimi";
 
-fn get_app_dir() -> Result<PathBuf, String> {
+fn get_app_dir() -> Result<PathBuf> {
     let app_dir;
 
     if let Some(dir) = std::env::var_os("HOME") {
         app_dir = PathBuf::from(dir).join(".mimi");
     } else {
-        return Err("Could not find the home dir".to_string());
+        bail!("could not find the home directory");
     }
 
-    fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&app_dir)
+        .with_context(|| format!("failed to create app directory {}", app_dir.display()))?;
 
     Ok(app_dir)
 }
@@ -26,14 +29,19 @@ pub async fn append_events(
     session_id: &String,
     events: &Vec<AgentEventItem>,
     create_new: bool,
-) -> Result<(), String> {
+) -> Result<()> {
     if session_id.is_empty() {
-        return Err("session Id is required".to_string());
+        bail!("session ID is required");
     }
 
-    let sessions_dir = get_app_dir().map_err(|e| e.to_string())?.join("sessions");
+    let sessions_dir = get_app_dir()?.join("sessions");
 
-    fs::create_dir_all(&sessions_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&sessions_dir).with_context(|| {
+        format!(
+            "failed to create sessions directory {}",
+            sessions_dir.display()
+        )
+    })?;
 
     let file_name = format!("{session_id}.jsonl");
     let path = sessions_dir.join(file_name);
@@ -41,17 +49,21 @@ pub async fn append_events(
     let file = OpenOptions::new()
         .create_new(create_new)
         .append(true)
-        .open(path)
-        .map_err(|e| e.to_string())?;
+        .open(&path)
+        .with_context(|| format!("failed to open session log {}", path.display()))?;
 
     let mut writer = BufWriter::new(file);
 
     for item in events {
-        let json = serde_json::to_string_pretty(&item).map_err(|e| e.to_string())?;
-        writeln!(writer, "{json}").map_err(|e| e.to_string())?;
+        let json =
+            serde_json::to_string_pretty(&item).context("failed to serialize session event")?;
+        writeln!(writer, "{json}")
+            .with_context(|| format!("failed to write session log {}", path.display()))?;
     }
 
-    writer.flush().map_err(|e| e.to_string())?;
+    writer
+        .flush()
+        .with_context(|| format!("failed to flush session log {}", path.display()))?;
 
     Ok(())
 }

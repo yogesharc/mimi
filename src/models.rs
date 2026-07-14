@@ -1,3 +1,4 @@
+use anyhow::{Context, Result, bail};
 use serde::{self, Serialize};
 use std::collections::HashMap;
 pub mod openai;
@@ -70,17 +71,12 @@ pub fn all_models() -> HashMap<String, Model> {
     models
 }
 
-pub fn get_model<'a>(
-    identifier: &str,
-    models: &'a HashMap<String, Model>,
-) -> Result<&'a Model, String> {
+pub fn get_model<'a>(identifier: &str, models: &'a HashMap<String, Model>) -> Result<&'a Model> {
     if identifier.is_empty() {
-        return Err("identifier is required".to_string());
+        bail!("identifier is required");
     };
 
-    let model = models
+    models
         .get(identifier)
-        .ok_or_else(|| "unknown model".to_string());
-
-    model
+        .with_context(|| format!("unknown model: {identifier}"))
 }

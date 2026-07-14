@@ -1,6 +1,7 @@
 use crate::parser::{AgentEventItem, ContextManagement, EffortLevel, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
+use anyhow::{Context, Result, bail};
 use futures::StreamExt;
 use std::env;
 
@@ -12,11 +13,11 @@ pub async fn get_response(
     effort: Option<&EffortLevel>,
     system_prompt: &Option<String>,
     context_management: &Option<Vec<ContextManagement>>,
-) -> Result<Vec<OpenRouterEvents>, String> {
+) -> Result<Vec<OpenRouterEvents>> {
     dotenvy::dotenv().ok();
 
-    let api_key =
-        env::var("OPENROUTER_API_KEY").map_err(|_| "Must have OPENROUTER_API_KEY".to_string())?;
+    let api_key = env::var("OPENROUTER_API_KEY")
+        .context("OPENROUTER_API_KEY environment variable is required")?;
 
     let req_body = ResponseRequest::new(model, input, effort, system_prompt, context_management);
 
@@ -28,12 +29,15 @@ pub async fn get_response(
         .json(&req_body)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .context("failed to send request to OpenRouter")?;
 
     let status = response.status();
     if !status.is_success() {
-        let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!("OpenRouter request failed with {status}: {body}"));
+        let body = response
+            .text()
+            .await
+            .context("failed to read OpenRouter error response")?;
+        bail!("OpenRouter request failed with {status}: {body}");
     }
 
     let mut res = response.bytes_stream();
@@ -42,7 +46,7 @@ pub async fn get_response(
     let mut buffer = String::new();
 
     while let Some(item) = res.next().await {
-        let chunk = item.map_err(|e| e.to_string())?;
+        let chunk = item.context("failed to read OpenRouter response stream")?;
         let chunk_text = String::from_utf8_lossy(&chunk);
         buffer.push_str(&chunk_text);
 
@@ -64,7 +68,7 @@ pub async fn get_response(
 
             let event = match serde_json::from_str::<OpenRouterEvents>(data) {
                 Ok(event) => event,
-                Err(e) => {
+                Err(_error) => {
                     // eprintln!("failed to parse event: {e}");
                     // eprintln!("failed item raw data: {data}");
                     continue;

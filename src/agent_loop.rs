@@ -1,5 +1,7 @@
 use uuid::Uuid;
 
+use anyhow::{Context as _, Result, bail};
+
 use super::parser::AgentEventItem;
 use super::response::get_response;
 use std::{
@@ -15,7 +17,7 @@ use crate::{
     tools::{self, SystemTools},
 };
 
-pub async fn run_loop() -> Result<(), String> {
+pub async fn run_loop() -> Result<()> {
     let initialize = Instant::now();
     let mut context = Context::default();
     context.build_system_prompt();
@@ -57,21 +59,20 @@ pub async fn run_loop() -> Result<(), String> {
             false => false,
         };
 
-        let _create_new_file = append_events(&session_id, &vec![new_msg.clone()], is_new_session)
+        append_events(&session_id, &vec![new_msg.clone()], is_new_session)
             .await
-            .map_err(|e| e.to_string())?;
+            .with_context(|| format!("failed to persist user message for session {session_id}"))?;
 
         // let selected_model_str = String::from("openai/gpt-5.5");
 
-        // let selected_model =
-        //     get_model(&selected_model_str, &available_models).map_err(|e| e.to_string())?;
+        // let selected_model = get_model(&selected_model_str, &available_models)?;
         // context.model = Some(selected_model);
 
         let _effort = EffortLevel::Medium;
 
-        let _token_usage_status = context
+        context
             .check_token_usage(input)
-            .map_err(|e| e.to_string())?;
+            .context("failed to check token usage")?;
 
         context.event_logs.push(new_msg);
 
@@ -104,7 +105,7 @@ pub async fn run_loop() -> Result<(), String> {
                                 ..
                             } => {
                                 let Some(tool) = SystemTools::variant_from_name(name) else {
-                                    return Err(format!("Unknown tool: {name}"));
+                                    bail!("unknown tool: {name}");
                                 };
 
                                 let search_struct = match &tool {
@@ -124,8 +125,9 @@ pub async fn run_loop() -> Result<(), String> {
                                     }
                                 };
 
-                                let output =
-                                    serde_json::to_string(&output).map_err(|e| e.to_string())?;
+                                let output = serde_json::to_string(&output).with_context(|| {
+                                    format!("failed to serialize output from {name}")
+                                })?;
 
                                 let tool_call_output = AgentEventItem::ToolCallOutput {
                                     id: format!("{}_output", id.clone()),
@@ -159,9 +161,11 @@ pub async fn run_loop() -> Result<(), String> {
             println!("");
             println!("tmp event_logs: {tmp_event_logs:?}");
 
-            let _append_res = append_events(&session_id, &tmp_event_logs, false)
+            append_events(&session_id, &tmp_event_logs, false)
                 .await
-                .map_err(|e| e.to_string())?;
+                .with_context(|| {
+                    format!("failed to persist response events for session {session_id}")
+                })?;
 
             context.event_logs.extend(tmp_event_logs);
 

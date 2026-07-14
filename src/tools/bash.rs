@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{self, Read},
+    io::Read,
     process::{Command, Stdio},
 };
 
@@ -21,7 +21,7 @@ pub fn bash(args: Value) -> Result<Value> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context("failed to spawn bash")?;
+        .with_context(|| format!("failed to spawn bash command: {command}"))?;
 
     let mut output = String::new();
     if let Some(mut o) = child.stdout.take() {

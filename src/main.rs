@@ -8,7 +8,7 @@ mod response;
 mod tools;
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
+async fn main() -> anyhow::Result<()> {
     agent_loop::run_loop().await?;
 
     Ok(())

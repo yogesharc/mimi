@@ -1,5 +1,7 @@
 use std::{fs, path::PathBuf};
 
+use anyhow::{Context as _, Result, bail};
+
 use crate::{
     models::Model,
     parser::{AgentEventItem, Usage},
@@ -31,7 +33,7 @@ impl Context<'_> {
 
         // let system_prompt_path = PathBuf::from("src/prompts/codex_opencode.txt");
         // let system_prompt = fs::read_to_string(system_prompt_path);
-        let system_prompt: Result<String, String> = Ok(String::new());
+        let system_prompt: Result<String> = Ok(String::new());
 
         match system_prompt {
             Ok(v) => context.push_str(&v),
@@ -56,9 +58,10 @@ impl Context<'_> {
         ()
     }
 
-    pub fn check_token_usage(&self, new_msg: String) -> Result<(), String> {
+    pub fn check_token_usage(&self, new_msg: String) -> Result<()> {
         let existing_usage = self.usage.total_tokens;
-        let upcoming_usage = u64::try_from(new_msg.len() / 4).map_err(|e| e.to_string())?;
+        let upcoming_usage =
+            u64::try_from(new_msg.len() / 4).context("failed to calculate upcoming token usage")?;
 
         println!("existing_usage: {existing_usage}");
         println!("upcoming_usage: {upcoming_usage}");
@@ -68,7 +71,7 @@ impl Context<'_> {
         if let Some(model) = self.model {
             context_window = model.context_window
         } else {
-            return Err("No model found".to_string());
+            bail!("no model found");
         }
 
         println!("context_window: {context_window}");
@@ -78,7 +81,7 @@ impl Context<'_> {
         println!("useable_context_window: {useable_context_window}");
 
         if existing_usage + upcoming_usage > context_window {
-            Err("Usage limit Exceed".to_string())
+            bail!("usage limit exceeded")
         } else {
             Ok(())
         }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
 pub mod approval;
@@ -128,8 +129,9 @@ impl SystemTools {
         }
     }
 
-    pub fn execute(&self, arguments: &str, search: Option<&Search>) -> Result<Value, String> {
-        let args: Value = serde_json::from_str(arguments).map_err(|e| e.to_string())?;
+    pub fn execute(&self, arguments: &str, search: Option<&Search>) -> Result<Value> {
+        let args: Value =
+            serde_json::from_str(arguments).context("failed to parse tool arguments as JSON")?;
 
         match self {
             SystemTools::ReadFile => read_file(args),
@@ -137,8 +139,7 @@ impl SystemTools {
                 let overwrite = args
                     .get("overwrite")
                     .and_then(|v| v.as_bool())
-                    .ok_or_else(|| "overwrite is missing")
-                    .map_err(|e| e.to_string())?;
+                    .context("overwrite is missing")?;
                 let mut approved = true;
                 let path;
 
@@ -146,8 +147,7 @@ impl SystemTools {
                     path = args
                         .get("path")
                         .and_then(|v| v.as_str())
-                        .ok_or_else(|| "path is missing")
-                        .map_err(|e| e.to_string())?;
+                        .context("path is missing")?;
 
                     println!("ASKING APPROVAL -- WRITE -- {path}");
 
@@ -163,15 +163,14 @@ impl SystemTools {
                 let path = args
                     .get("path")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| "path is missing")
-                    .map_err(|e| e.to_string())?;
+                    .context("path is missing")?;
 
                 println!("ASKING APPROVAL -- EDIT -- {path}");
 
                 let approved = approve_tool();
 
                 if approved {
-                    edit_file(args).map_err(|e| e.to_string())
+                    edit_file(args)
                 } else {
                     Ok(serde_json::json!({"status": "tool call rejected by user"}))
                 }
@@ -180,24 +179,23 @@ impl SystemTools {
                 let cmd = args
                     .get("command")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| "command is missing")
-                    .map_err(|e| e.to_string())?;
+                    .context("command is missing")?;
 
                 println!("ASKING APPROVAL: {cmd}");
                 let approved = approve_tool();
 
                 if approved {
-                    bash(args).map_err(|e| e.to_string())
+                    bash(args)
                 } else {
                     Ok(serde_json::json!({"status": "tool call rejected by user"}))
                 }
             }
             SystemTools::SearchFiles => {
-                let search = search.ok_or_else(|| "search state is required".to_string())?;
+                let search = search.context("search state is required")?;
                 search.search_files(args)
             }
             SystemTools::SearchContent => {
-                let search = search.ok_or_else(|| "search state is required".to_string())?;
+                let search = search.context("search state is required")?;
                 search.search_content(args)
             }
         }

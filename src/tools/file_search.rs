@@ -1,4 +1,5 @@
 use crate::tools::{Property, ToolDefinition};
+use anyhow::{Context, Result, bail};
 use fff_search::{
     FFFMode, FilePickerOptions, FrecencyTracker, FuzzySearchOptions, GrepMode, GrepSearchOptions,
     Location, PaginationArgs, QueryParser, QueryTracker, SharedFilePicker, SharedFrecency,
@@ -29,25 +30,25 @@ impl Default for Search {
 }
 
 impl Search {
-    pub fn index_cwd(&mut self) -> Result<(), String> {
-        let dir_path = env::current_dir().map_err(|e| e.to_string())?;
+    pub fn index_cwd(&mut self) -> Result<()> {
+        let dir_path = env::current_dir().context("failed to get current directory")?;
 
-        let frecency =
-            FrecencyTracker::open(dir_path.join("frecency")).map_err(|e| e.to_string())?;
+        let frecency = FrecencyTracker::open(dir_path.join("frecency"))
+            .context("failed to open frecency tracker")?;
         self.shared_frecency
             .init(frecency)
-            .map_err(|e| e.to_string())?;
+            .context("failed to initialize frecency tracker")?;
 
         let query_tracker =
-            QueryTracker::open(dir_path.join("queries")).map_err(|e| e.to_string())?;
+            QueryTracker::open(dir_path.join("queries")).context("failed to open query tracker")?;
 
         self.shared_query_tracker
             .init(query_tracker)
-            .map_err(|e| e.to_string())?;
+            .context("failed to initialize query tracker")?;
 
         let dir = dir_path
             .to_str()
-            .ok_or_else(|| "couldnt convert".to_string())?
+            .context("current directory is not valid UTF-8")?
             .to_string();
 
         FilePicker::new_with_shared_state(
@@ -59,7 +60,7 @@ impl Search {
                 ..Default::default()
             },
         )
-        .map_err(|e| e.to_string())?;
+        .context("failed to initialize file picker")?;
 
         self.shared_picker
             .wait_for_scan(std::time::Duration::from_secs(10));
@@ -67,21 +68,24 @@ impl Search {
         Ok(())
     }
 
-    pub fn search_files(&self, search_query: Value) -> Result<Value, String> {
-        let picker_guard = self.shared_picker.read().map_err(|e| e.to_string())?;
+    pub fn search_files(&self, search_query: Value) -> Result<Value> {
+        let picker_guard = match self.shared_picker.read() {
+            Ok(guard) => guard,
+            Err(_) => bail!("failed to acquire file picker read lock"),
+        };
         let picker = picker_guard
             .as_ref()
-            .ok_or_else(|| "search index has not been initialized".to_string())?;
+            .context("search index has not been initialized")?;
 
-        let qt_guard = self
-            .shared_query_tracker
-            .read()
-            .map_err(|e| e.to_string())?;
+        let qt_guard = match self.shared_query_tracker.read() {
+            Ok(guard) => guard,
+            Err(_) => bail!("failed to acquire query tracker read lock"),
+        };
 
         let search_query = search_query
             .get("query")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "missing query".to_string())?;
+            .context("missing query")?;
 
         let parser = QueryParser::default();
         let query = parser.parse(search_query);
@@ -113,19 +117,22 @@ impl Search {
             location: search_results.location.map(Loc::from),
         };
 
-        Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
+        serde_json::to_value(results).context("failed to serialize file search results")
     }
 
-    pub fn search_content(&self, search_query: Value) -> Result<Value, String> {
-        let picker_guard = self.shared_picker.read().map_err(|e| e.to_string())?;
+    pub fn search_content(&self, search_query: Value) -> Result<Value> {
+        let picker_guard = match self.shared_picker.read() {
+            Ok(guard) => guard,
+            Err(_) => bail!("failed to acquire file picker read lock"),
+        };
         let picker = picker_guard
             .as_ref()
-            .ok_or_else(|| "search index has not been initialized".to_string())?;
+            .context("search index has not been initialized")?;
 
         let query_str = search_query
             .get("query")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| "missing query".to_string())?;
+            .context("missing query")?;
 
         let mode = match search_query
             .get("mode")
@@ -178,7 +185,7 @@ impl Search {
 
         // println!("CONTENT SEARCH RESULT: {results:?}");
 
-        Ok(serde_json::to_value(results).map_err(|e| e.to_string())?)
+        serde_json::to_value(results).context("failed to serialize content search results")
     }
 
     pub fn def_search_files() -> ToolDefinition {

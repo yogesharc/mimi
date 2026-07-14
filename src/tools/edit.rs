@@ -7,7 +7,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 
 use crate::tools::{Property, ToolDefinition};
 
@@ -27,10 +27,12 @@ enum EditType {
 }
 
 pub fn edit_file(args: Value) -> Result<Value> {
-    let edit = serde_json::from_value::<Edit>(args)?;
+    let edit =
+        serde_json::from_value::<Edit>(args).context("failed to parse edit tool arguments")?;
     let path = Path::new(&edit.path);
 
-    let mut content = read_to_string(path)?;
+    let mut content =
+        read_to_string(path).with_context(|| format!("failed to read file {}", path.display()))?;
 
     match edit.r#type {
         EditType::Replace | EditType::Delete => {
@@ -39,7 +41,8 @@ pub fn edit_file(args: Value) -> Result<Value> {
 
             let updated_content = content.replacen(old_content, new_content, 1);
 
-            fs::write(path, updated_content)?;
+            fs::write(path, updated_content)
+                .with_context(|| format!("failed to write file {}", path.display()))?;
         }
         EditType::Append => {
             let old_content = edit.old_content.as_deref().unwrap_or("");
@@ -50,7 +53,8 @@ pub fn edit_file(args: Value) -> Result<Value> {
             };
             content.insert_str(idx + old_content.len(), new_content);
 
-            fs::write(path, content)?;
+            fs::write(path, content)
+                .with_context(|| format!("failed to write file {}", path.display()))?;
         }
     }
 

@@ -1,4 +1,5 @@
 use crate::tools::{Property, ToolDefinition};
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use serde_json::Value;
 use std::{
@@ -16,13 +17,15 @@ struct WriteArgs {
     content: String,
 }
 
-pub fn write_to_file(args: Value) -> Result<Value, String> {
-    let parsed_args = serde_json::from_value::<WriteArgs>(args).map_err(|e| e.to_string())?;
+pub fn write_to_file(args: Value) -> Result<Value> {
+    let parsed_args = serde_json::from_value::<WriteArgs>(args)
+        .context("failed to parse write tool arguments")?;
 
     let path = Path::new(&parsed_args.path);
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create directory {}", parent.display()))?;
     }
 
     let mut file = OpenOptions::new()
@@ -30,25 +33,25 @@ pub fn write_to_file(args: Value) -> Result<Value, String> {
         .create(true)
         .truncate(parsed_args.overwrite)
         .open(path)
-        .map_err(|e| e.to_string())?;
+        .with_context(|| format!("failed to open file {}", path.display()))?;
 
     file.write_all(parsed_args.content.as_bytes())
-        .map_err(|e| e.to_string())?;
+        .with_context(|| format!("failed to write file {}", path.display()))?;
 
     Ok(serde_json::json!({"success:": "ok"}))
 }
 
-pub fn make_a_copy(path: &str) -> Result<(), String> {
+pub fn make_a_copy(path: &str) -> Result<()> {
     let id = Uuid::now_v7();
     let to = format!("{id}-{path}");
 
-    fs::copy(path, to).map_err(|e| e.to_string())?;
+    fs::copy(path, &to).with_context(|| format!("failed to copy {path} to {to}"))?;
 
     Ok(())
 }
 
-pub fn delete_file(path: &str) -> Result<(), String> {
-    fs::remove_file(path).map_err(|e| e.to_string())?;
+pub fn delete_file(path: &str) -> Result<()> {
+    fs::remove_file(path).with_context(|| format!("failed to delete file {path}"))?;
 
     Ok(())
 }
