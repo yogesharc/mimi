@@ -90,7 +90,7 @@ pub enum AgentEventItem {
 pub struct Content {
     #[serde(rename = "type")]
     content_type: String,
-    text: String,
+    pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     annotations: Option<Vec<Value>>,
 }
@@ -145,6 +145,7 @@ impl<'a> ResponseRequest<'a> {
 pub enum Role {
     User,
     Assistant,
+    System,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

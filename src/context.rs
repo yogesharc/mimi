@@ -28,6 +28,10 @@ impl Default for Context<'_> {
 }
 
 impl Context<'_> {
+    pub fn estimate_token_usage(text: &str) -> Result<u64> {
+        u64::try_from(text.chars().count().div_ceil(4)).context("failed to calculate token usage")
+    }
+
     pub fn build_system_prompt(&mut self) {
         let mut context: String = String::new();
 
@@ -58,13 +62,13 @@ impl Context<'_> {
         ()
     }
 
-    pub fn check_token_usage(&self, new_msg: String) -> Result<()> {
+    pub fn exceed_token_usage(&self, new_msg: Option<&str>) -> Result<bool> {
         let existing_usage = self.usage.total_tokens;
-        let upcoming_usage =
-            u64::try_from(new_msg.len() / 4).context("failed to calculate upcoming token usage")?;
+        let mut upcoming_usage = 0;
 
-        println!("existing_usage: {existing_usage}");
-        println!("upcoming_usage: {upcoming_usage}");
+        if let Some(msg) = new_msg {
+            upcoming_usage = Self::estimate_token_usage(msg)?;
+        };
 
         let context_window;
 
@@ -74,16 +78,18 @@ impl Context<'_> {
             bail!("no model found");
         }
 
-        println!("context_window: {context_window}");
-
         let useable_context_window = self.compact_threshold_percentage * context_window / 100;
 
-        println!("useable_context_window: {useable_context_window}");
+        println!(
+            "EXISTING USAGE: {} , UPCOMING: {}, WINDOW: {}",
+            existing_usage, upcoming_usage, useable_context_window
+        );
 
-        if existing_usage + upcoming_usage > context_window {
-            bail!("usage limit exceeded")
+        if existing_usage + upcoming_usage > useable_context_window {
+            println!("HIT TOKEN LIMIT");
+            Ok(true)
         } else {
-            Ok(())
+            Ok(false)
         }
     }
 }
@@ -91,6 +97,31 @@ impl Context<'_> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::models::{all_models, get_model};
+
+    #[test]
+    fn token_limit_is_not_hit_below_compaction_threshold() {
+        let models = all_models();
+        let model = get_model("openai/gpt-5.6-sol", &models).unwrap();
+        let mut context = Context::default();
+        context.model = Some(model);
+        let threshold = context.compact_threshold_percentage * model.context_window / 100;
+        context.usage.total_tokens = threshold - 1;
+
+        assert!(!context.exceed_token_usage(None).unwrap());
+    }
+
+    #[test]
+    fn token_limit_is_hit_above_compaction_threshold() {
+        let models = all_models();
+        let model = get_model("openai/gpt-5.6-sol", &models).unwrap();
+        let mut context = Context::default();
+        context.model = Some(model);
+        let threshold = context.compact_threshold_percentage * model.context_window / 100;
+        context.usage.total_tokens = threshold;
+
+        assert!(context.exceed_token_usage(Some("testing")).unwrap());
+    }
 
     #[test]
     fn syssy() {
