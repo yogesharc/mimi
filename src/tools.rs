@@ -12,7 +12,7 @@ pub mod write;
 use file_search::Search;
 
 use crate::tools::{
-    approval::approve_tool,
+    // approval::approve_tool,
     bash::{bash, def_bash},
     edit::{def_edit_file, edit_file},
     read::{def_read_file, read_file},

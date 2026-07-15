@@ -83,7 +83,16 @@ async fn parse_response_events(
                 return Ok(());
             }
 
-            let event: OpenRouterEvents = serde_json::from_str(data)?;
+            // let event: OpenRouterEvents = serde_json::from_str(data)?;
+
+            let event = match serde_json::from_str::<OpenRouterEvents>(data) {
+                Ok(event) => event,
+                Err(_error) => {
+                    // eprintln!("failed to parse event: {e}");
+                    // eprintln!("failed item raw data: {data}");
+                    continue;
+                }
+            };
 
             if event_tx.send(Ok(event)).await.is_err() {
                 return Ok(());

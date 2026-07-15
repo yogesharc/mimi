@@ -27,7 +27,7 @@ async fn get_app_dir() -> Result<PathBuf> {
 }
 
 pub async fn append_events(
-    session_id: &String,
+    session_id: &str,
     events: &Vec<AgentEventItem>,
     create_new: bool,
 ) -> Result<()> {
