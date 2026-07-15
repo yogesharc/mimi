@@ -13,8 +13,11 @@ use crate::{
     context::Context,
     events::append_events,
     models::{all_models, get_model},
-    parser::{EffortLevel, OpenRouterEvents},
-    tools::{self, SystemTools},
+    parser::{
+        EffortLevel,
+        OpenRouterEvents::{self},
+    },
+    tools::{self, SystemTools, file_search::Search},
 };
 
 const COMPACTION_PROMPT: &str = "Create a concise continuation summary of the conversation. Preserve the user's current goal, important decisions, relevant file paths and code details, tool results, errors, and unfinished work. Omit greetings, repetition, and obsolete discussion. Write only the summary needed for another assistant to continue the task without losing context.";
@@ -33,26 +36,30 @@ pub async fn run_loop() -> Result<()> {
     let default_model = get_model(&default_model_str, &available_models)?;
     context.model = Some(default_model);
 
-    // let context_management = Some(vec![ContextManagement {
-    //     compact_threshold: context.compact_threshold_percentage
-    //         * context.model.unwrap().context_window
-    //         / 100,
-    //     ..Default::default()
-    // }]);
+    println!("Initialized in {:?}", initialize.elapsed());
 
+    let search_initialize = Instant::now();
     let mut search = tools::file_search::Search::default();
     search.index_cwd()?;
 
-    println!("PROGRAM INITIALIZED: {:?}", initialize.elapsed());
+    // println!("SEARCH INITIALIZED: {:?}", search_initialize.elapsed());
+
+    println!("");
+    println!("============================");
+    println!("||     MIMI v0.1  ^_^     ||");
+    println!("============================");
+    println!("");
 
     'outer: loop {
         let mut compaction = false;
         let input = ask_input();
-
         if input == "exit" {
             break 'outer;
+        } else if input.is_empty() {
+            println!("You need to type something");
+            continue;
         }
-
+        println!("============== ASSISTANT ==============");
         let user_msg = AgentEventItem::new_user_message(input.clone());
         let mut request_msg = user_msg.clone();
 
@@ -115,62 +122,38 @@ pub async fn run_loop() -> Result<()> {
             }
             tmp_event_logs = Vec::new();
 
-            let events = get_response(
+            let mut events = get_response(
                 context.model.unwrap().full_identifier(),
                 &context.event_logs,
                 None,
                 &context.system_prompt,
-                &None, // &context_management,
+                // &context_management,
             )
             .await?;
 
-            for event in events {
+            while let Some(event) = events.recv().await {
+                let event = event?;
+                // let mut msg_item_id = String::new();
+
+                // println!("RECEIVED EVENT: {:?}", event);
+
                 match event {
-                    // OpenRouterEvents::ResponseCreated { response } => {}
+                    OpenRouterEvents::ResponseOutputTextDelta { item_id, delta, .. } => {
+                        // if msg_item_id == item_id {
+                        //     println!("{delta}");
+                        // } else if msg_item_id.is_empty() {
+                        //     println!("{delta}");
+                        //     msg_item_id = item_id;
+                        // } else {
+                        //     println!("");
+                        //     println!("{delta}");
+                        //     msg_item_id = item_id;
+                        // }
+                        print!("{delta}");
+                        let _ = io::stdout().flush();
+                    }
                     OpenRouterEvents::ResponseOutputItemDone { item, .. } => {
                         match &item {
-                            AgentEventItem::ToolCall {
-                                id,
-                                call_id,
-                                name,
-                                arguments,
-                                ..
-                            } => {
-                                let Some(tool) = SystemTools::variant_from_name(name) else {
-                                    bail!("unknown tool: {name}");
-                                };
-
-                                let search_struct = match &tool {
-                                    SystemTools::SearchFiles | SystemTools::SearchContent => {
-                                        Some(&search)
-                                    }
-                                    _ => None,
-                                };
-
-                                let output = SystemTools::execute(&tool, arguments, search_struct);
-
-                                let output = match output {
-                                    Ok(value) => value,
-                                    Err(e) => {
-                                        eprintln!("{e}");
-                                        serde_json::json!({"error": e.to_string()})
-                                    }
-                                };
-
-                                let output = serde_json::to_string(&output).with_context(|| {
-                                    format!("failed to serialize output from {name}")
-                                })?;
-
-                                let tool_call_output = AgentEventItem::ToolCallOutput {
-                                    id: format!("{}_output", id.clone()),
-                                    call_id: call_id.clone(),
-                                    output: output,
-                                };
-
-                                tmp_event_logs.push(item);
-                                tmp_event_logs.push(tool_call_output);
-                                stop_agent = false;
-                            }
                             AgentEventItem::Reasoning { summary, .. } => {
                                 if !summary.is_empty() {
                                     tmp_event_logs.push(item);
@@ -208,8 +191,21 @@ pub async fn run_loop() -> Result<()> {
                     _ => {}
                 }
             }
-            println!("");
-            println!("tmp event_logs: {tmp_event_logs:?}");
+
+            // println!("tmp event_logs: {tmp_event_logs:?}");
+
+            let mut tool_call_outputs = Vec::new();
+
+            for event in &tmp_event_logs {
+                if let AgentEventItem::ToolCall { .. } = event {
+                    tool_call_outputs.push(execute_tool_call(event, &search)?);
+                }
+            }
+
+            if !tool_call_outputs.is_empty() {
+                tmp_event_logs.extend(tool_call_outputs);
+                stop_agent = false;
+            }
 
             append_events(&session_id, &tmp_event_logs, false)
                 .await
@@ -230,7 +226,9 @@ pub async fn run_loop() -> Result<()> {
             }
 
             if stop_agent {
-                println!("RESPONSE TIME: {:?}", response_time.elapsed());
+                println!("");
+                println!("");
+                println!("{:?}", response_time.elapsed());
                 break 'agent_loop;
             }
         }
@@ -250,4 +248,47 @@ fn ask_input() -> String {
         .expect("Failed to read input");
 
     input.trim().to_string()
+}
+
+fn execute_tool_call(item: &AgentEventItem, search: &Search) -> Result<AgentEventItem> {
+    if let AgentEventItem::ToolCall {
+        id,
+        call_id,
+        name,
+        arguments,
+        ..
+    } = item
+    {
+        let Some(tool) = SystemTools::variant_from_name(name) else {
+            bail!("unknown tool: {name}");
+        };
+
+        let search_struct = match &tool {
+            SystemTools::SearchFiles | SystemTools::SearchContent => Some(search),
+            _ => None,
+        };
+
+        let output = SystemTools::execute(&tool, arguments, search_struct);
+
+        let output = match output {
+            Ok(value) => value,
+            Err(e) => {
+                eprintln!("{e}");
+                serde_json::json!({"error": e.to_string()})
+            }
+        };
+
+        let output = serde_json::to_string(&output)
+            .with_context(|| format!("failed to serialize output from {name}"))?;
+
+        let tool_call_output = AgentEventItem::ToolCallOutput {
+            id: format!("{}_output", id.clone()),
+            call_id: call_id.clone(),
+            output: output,
+        };
+
+        Ok(tool_call_output)
+    } else {
+        bail!("not a tool call to execute")
+    }
 }

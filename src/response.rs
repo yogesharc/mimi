@@ -1,9 +1,10 @@
-use crate::parser::{AgentEventItem, ContextManagement, EffortLevel, OpenRouterEvents};
+use crate::parser::{AgentEventItem, EffortLevel, OpenRouterEvents};
 
 use super::parser::ResponseRequest;
 use anyhow::{Context, Result, bail};
 use futures::StreamExt;
 use std::env;
+use tokio::sync::mpsc;
 
 static BASE_URL: &str = "https://openrouter.ai/api/v1/responses";
 
@@ -12,14 +13,14 @@ pub async fn get_response(
     input: &Vec<AgentEventItem>,
     effort: Option<&EffortLevel>,
     system_prompt: &Option<String>,
-    context_management: &Option<Vec<ContextManagement>>,
-) -> Result<Vec<OpenRouterEvents>> {
+    // context_management: &Option<Vec<ContextManagement>>,
+) -> Result<mpsc::Receiver<Result<OpenRouterEvents>>> {
     dotenvy::dotenv().ok();
 
     let api_key = env::var("OPENROUTER_API_KEY")
         .context("OPENROUTER_API_KEY environment variable is required")?;
 
-    let req_body = ResponseRequest::new(model, input, effort, system_prompt, context_management);
+    let req_body = ResponseRequest::new(model, input, effort, system_prompt);
 
     let client = reqwest::Client::new();
 
@@ -40,12 +41,28 @@ pub async fn get_response(
         bail!("OpenRouter request failed with {status}: {body}");
     }
 
-    let mut res = response.bytes_stream();
+    let (tx, rx) = mpsc::channel(128);
 
-    let mut events: Vec<OpenRouterEvents> = vec![];
+    tokio::spawn(async move {
+        let mut event_tx = tx;
+        let result = parse_response_events(response, &mut event_tx).await;
+
+        if let Err(error) = result {
+            let _ = event_tx.send(Err(error)).await;
+        }
+    });
+
+    Ok(rx)
+}
+
+async fn parse_response_events(
+    response: reqwest::Response,
+    event_tx: &mut mpsc::Sender<Result<OpenRouterEvents>>,
+) -> Result<()> {
+    let mut stream = response.bytes_stream();
     let mut buffer = String::new();
 
-    while let Some(item) = res.next().await {
+    while let Some(item) = stream.next().await {
         let chunk = item.context("failed to read OpenRouter response stream")?;
         let chunk_text = String::from_utf8_lossy(&chunk);
         buffer.push_str(&chunk_text);
@@ -63,21 +80,16 @@ pub async fn get_response(
             let data = line.trim_start_matches("data:").trim();
 
             if data == "[DONE]" {
-                return Ok(events);
+                return Ok(());
             }
 
-            let event = match serde_json::from_str::<OpenRouterEvents>(data) {
-                Ok(event) => event,
-                Err(_error) => {
-                    // eprintln!("failed to parse event: {e}");
-                    // eprintln!("failed item raw data: {data}");
-                    continue;
-                }
-            };
+            let event: OpenRouterEvents = serde_json::from_str(data)?;
 
-            events.push(event);
+            if event_tx.send(Ok(event)).await.is_err() {
+                return Ok(());
+            };
         }
     }
 
-    Ok(events)
+    Ok(())
 }

@@ -25,7 +25,7 @@ pub fn models() -> Vec<Model> {
         provider: Providers::OpenAI,
         identifier: "gpt-5.6-sol".to_string(),
         name: "GPT 5.6 Sol".to_string(),
-        context_window: 10000,
+        context_window: 400000,
         input_formats: vec![Modalities::Text, Modalities::Image, Modalities::File],
         output_formats: vec![Modalities::Text],
         reasoning: true,

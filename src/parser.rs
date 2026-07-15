@@ -31,8 +31,8 @@ pub struct ResponseRequest<'a> {
     reasoning: Option<Reasoning<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     instructions: &'a Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    context_management: &'a Option<Vec<ContextManagement>>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // context_management: &'a Option<Vec<ContextManagement>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,7 +124,7 @@ impl<'a> ResponseRequest<'a> {
         input: &'a Vec<AgentEventItem>,
         effort: Option<&'a EffortLevel>,
         system_prompt: &'a Option<String>,
-        context_management: &'a Option<Vec<ContextManagement>>,
+        // context_management: &'a Option<Vec<ContextManagement>>,
     ) -> Self {
         let sys_tool_definitions = tools::SystemTools::all()
             .iter()
@@ -141,7 +141,7 @@ impl<'a> ResponseRequest<'a> {
             tool_choice: Some("auto".to_string()),
             reasoning,
             instructions: system_prompt,
-            context_management,
+            // context_management,
         }
     }
 }

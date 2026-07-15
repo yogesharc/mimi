@@ -136,59 +136,64 @@ impl SystemTools {
         match self {
             SystemTools::ReadFile => read_file(args),
             SystemTools::WriteFile => {
-                let overwrite = args
-                    .get("overwrite")
-                    .and_then(|v| v.as_bool())
-                    .context("overwrite is missing")?;
-                let mut approved = true;
-                let path;
+                write_to_file(args)
 
-                if overwrite {
-                    path = args
-                        .get("path")
-                        .and_then(|v| v.as_str())
-                        .context("path is missing")?;
+                // let overwrite = args
+                //     .get("overwrite")
+                //     .and_then(|v| v.as_bool())
+                //     .context("overwrite is missing")?;
+                // let mut approved = true;
+                // let path;
 
-                    println!("ASKING APPROVAL -- WRITE -- {path}");
+                // if overwrite {
+                //     path = args
+                //         .get("path")
+                //         .and_then(|v| v.as_str())
+                //         .context("path is missing")?;
 
-                    approved = approve_tool();
-                }
-                if approved {
-                    write_to_file(args)
-                } else {
-                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                }
+                //     println!("ASKING APPROVAL -- WRITE -- {path}");
+
+                //     approved = approve_tool();
+                // }
+                // if approved {
+                //     write_to_file(args)
+                // } else {
+                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                // }
             }
             SystemTools::EditFile => {
-                let path = args
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .context("path is missing")?;
+                edit_file(args)
 
-                println!("ASKING APPROVAL -- EDIT -- {path}");
+                // let path = args
+                //     .get("path")
+                //     .and_then(|v| v.as_str())
+                //     .context("path is missing")?;
 
-                let approved = approve_tool();
+                // println!("ASKING APPROVAL -- EDIT -- {path}");
 
-                if approved {
-                    edit_file(args)
-                } else {
-                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                }
+                // let approved = approve_tool();
+
+                // if approved {
+                //     edit_file(args)
+                // } else {
+                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                // }
             }
             SystemTools::Bash => {
-                let cmd = args
-                    .get("command")
-                    .and_then(|v| v.as_str())
-                    .context("command is missing")?;
+                bash(args)
+                // let cmd = args
+                //     .get("command")
+                //     .and_then(|v| v.as_str())
+                //     .context("command is missing")?;
 
-                println!("ASKING APPROVAL: {cmd}");
-                let approved = approve_tool();
+                // println!("ASKING APPROVAL: {cmd}");
+                // let approved = approve_tool();
 
-                if approved {
-                    bash(args)
-                } else {
-                    Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                }
+                // if approved {
+                //     bash(args)
+                // } else {
+                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
+                // }
             }
             SystemTools::SearchFiles => {
                 let search = search.context("search state is required")?;

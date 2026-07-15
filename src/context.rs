@@ -57,6 +57,10 @@ impl Context<'_> {
             return;
         }
 
+        let system_tokens = Self::estimate_token_usage(&context).unwrap_or(0);
+
+        self.usage.input_tokens += system_tokens;
+
         self.system_prompt = Some(context);
 
         ()
@@ -80,10 +84,10 @@ impl Context<'_> {
 
         let useable_context_window = self.compact_threshold_percentage * context_window / 100;
 
-        println!(
-            "EXISTING USAGE: {} , UPCOMING: {}, WINDOW: {}",
-            existing_usage, upcoming_usage, useable_context_window
-        );
+        // println!(
+        //     "EXISTING USAGE: {} , UPCOMING: {}, WINDOW: {}",
+        //     existing_usage, upcoming_usage, useable_context_window
+        // );
 
         if existing_usage + upcoming_usage > useable_context_window {
             println!("HIT TOKEN LIMIT");
