@@ -53,6 +53,12 @@ impl Default for ContextManagement {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum AgentEventItem {
+    // #[serde(rename = "session_start")]
+    // SessionStart {
+    //     session_id: String,
+    //     gen_id: String,
+    //     created_at: String,
+    // },
     #[serde(rename = "message")]
     Message {
         #[serde(skip_serializing_if = "Option::is_none")]

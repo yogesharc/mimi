@@ -8,7 +8,7 @@ use std::{
     io::Write,
     path::Path,
 };
-use uuid::Uuid;
+// use uuid::Uuid;
 
 #[derive(Deserialize)]
 struct WriteArgs {
@@ -41,20 +41,20 @@ pub fn write_to_file(args: Value) -> Result<Value> {
     Ok(serde_json::json!({"success:": "ok"}))
 }
 
-pub fn make_a_copy(path: &str) -> Result<()> {
-    let id = Uuid::now_v7();
-    let to = format!("{id}-{path}");
+// pub fn make_a_copy(path: &str) -> Result<()> {
+//     let id = Uuid::now_v7();
+//     let to = format!("{id}-{path}");
 
-    fs::copy(path, &to).with_context(|| format!("failed to copy {path} to {to}"))?;
+//     fs::copy(path, &to).with_context(|| format!("failed to copy {path} to {to}"))?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-pub fn delete_file(path: &str) -> Result<()> {
-    fs::remove_file(path).with_context(|| format!("failed to delete file {path}"))?;
+// pub fn delete_file(path: &str) -> Result<()> {
+//     fs::remove_file(path).with_context(|| format!("failed to delete file {path}"))?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 pub fn def_write_to_file() -> ToolDefinition {
     let name = "write_to_file".to_string();
