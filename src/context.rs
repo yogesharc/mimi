@@ -4,7 +4,7 @@ use anyhow::{Context as _, Result, bail};
 
 use crate::{
     models::Model,
-    parser::{AgentEventItem, Usage},
+    parser::{AgentEventItem, EffortLevel, Usage},
 };
 
 pub struct Context<'a> {
@@ -13,6 +13,7 @@ pub struct Context<'a> {
     pub usage: Usage,
     pub compact_threshold_percentage: u64,
     pub model: Option<&'a Model>,
+    pub effort: Option<EffortLevel>,
 }
 
 impl Default for Context<'_> {
@@ -23,6 +24,7 @@ impl Default for Context<'_> {
             usage: Usage::default(),
             compact_threshold_percentage: 10,
             model: None,
+            effort: None,
         }
     }
 }
@@ -106,7 +108,7 @@ mod test {
     #[test]
     fn token_limit_is_not_hit_below_compaction_threshold() {
         let models = all_models();
-        let model = get_model("openai/gpt-5.6-sol", &models).unwrap();
+        let model = get_model(&Some("openai/gpt-5.6-sol".to_string()), &models).unwrap();
         let mut context = Context::default();
         context.model = Some(model);
         let threshold = context.compact_threshold_percentage * model.context_window / 100;
@@ -118,7 +120,7 @@ mod test {
     #[test]
     fn token_limit_is_hit_above_compaction_threshold() {
         let models = all_models();
-        let model = get_model("openai/gpt-5.6-sol", &models).unwrap();
+        let model = get_model(&Some("openai/gpt-5.6-sol".to_string()), &models).unwrap();
         let mut context = Context::default();
         context.model = Some(model);
         let threshold = context.compact_threshold_percentage * model.context_window / 100;

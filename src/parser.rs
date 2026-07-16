@@ -35,20 +35,20 @@ pub struct ResponseRequest<'a> {
     // context_management: &'a Option<Vec<ContextManagement>>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ContextManagement {
-    pub r#type: String,
-    pub compact_threshold: u64,
-}
+// #[derive(Debug, Serialize)]
+// pub struct ContextManagement {
+//     pub r#type: String,
+//     pub compact_threshold: u64,
+// }
 
-impl Default for ContextManagement {
-    fn default() -> Self {
-        Self {
-            r#type: "compaction".to_string(),
-            compact_threshold: 200000,
-        }
-    }
-}
+// impl Default for ContextManagement {
+//     fn default() -> Self {
+//         Self {
+//             r#type: "compaction".to_string(),
+//             compact_threshold: 200000,
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]

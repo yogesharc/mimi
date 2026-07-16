@@ -83,8 +83,6 @@ async fn parse_response_events(
                 return Ok(());
             }
 
-            // let event: OpenRouterEvents = serde_json::from_str(data)?;
-
             let event = match serde_json::from_str::<OpenRouterEvents>(data) {
                 Ok(event) => event,
                 Err(_error) => {

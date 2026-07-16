@@ -71,12 +71,16 @@ pub fn all_models() -> HashMap<String, Model> {
     models
 }
 
-pub fn get_model<'a>(identifier: &str, models: &'a HashMap<String, Model>) -> Result<&'a Model> {
-    if identifier.is_empty() {
-        bail!("identifier is required");
+pub fn get_model<'a>(
+    identifier: &Option<String>,
+    models: &'a HashMap<String, Model>,
+) -> Result<&'a Model> {
+    let identifier_str = match identifier {
+        Some(v) => v,
+        None => "openai/gpt-5.6-sol", // default model
     };
 
     models
-        .get(identifier)
-        .with_context(|| format!("unknown model: {identifier}"))
+        .get(identifier_str)
+        .with_context(|| format!("unknown model: {identifier_str}"))
 }

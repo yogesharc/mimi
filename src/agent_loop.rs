@@ -51,7 +51,7 @@ pub async fn run(
         let mut events = get_response(
             context.model.unwrap().full_identifier(),
             &context.event_logs,
-            None,
+            context.effort.as_ref(),
             &context.system_prompt,
         )
         .await?;
@@ -60,7 +60,8 @@ pub async fn run(
             let event = event?;
 
             if let RunMode::JsonStream = mode {
-                println!("{:?}", event);
+                let json = serde_json::to_string(&event)?;
+                println!("{}", json);
             }
 
             match event {
@@ -116,7 +117,14 @@ pub async fn run(
 
         for event in &tmp_event_logs {
             if let AgentEventItem::ToolCall { .. } = event {
-                tool_call_outputs.push(execute_tool_call(event, &search)?);
+                let output = execute_tool_call(event, &search)?;
+
+                if let RunMode::JsonStream = mode {
+                    let json = serde_json::to_string(&output)?;
+                    println!("{json}");
+                }
+
+                tool_call_outputs.push(output);
             }
         }
 
@@ -174,7 +182,7 @@ fn execute_tool_call(item: &AgentEventItem, search: &Search) -> Result<AgentEven
         let output = match output {
             Ok(value) => value,
             Err(e) => {
-                eprintln!("{e}");
+                // eprintln!("{e}");
                 serde_json::json!({"error": e.to_string()})
             }
         };
