@@ -86,8 +86,7 @@ async fn parse_response_events(
             let event = match serde_json::from_str::<OpenRouterEvents>(data) {
                 Ok(event) => event,
                 Err(_error) => {
-                    // eprintln!("failed to parse event: {e}");
-                    // eprintln!("failed item raw data: {data}");
+                    // eprintln!("skipping unsupported OpenRouter event: {error}");
                     continue;
                 }
             };

@@ -92,7 +92,7 @@ impl Context<'_> {
         // );
 
         if existing_usage + upcoming_usage > useable_context_window {
-            println!("HIT TOKEN LIMIT");
+            eprintln!("hit usable usage token limit");
             Ok(true)
         } else {
             Ok(false)

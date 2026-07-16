@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -16,8 +16,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    Stdio,
-    Exec,
+    Json,
 }
 
 pub fn parse_cmd() -> Result<Cli> {

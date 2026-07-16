@@ -1,10 +1,7 @@
 use std::io::{self, Write};
 
 use crate::{
-    context::Context,
-    events::append_events,
-    parser::{AgentEventItem, EffortLevel},
-    runtime::{self, RunMode},
+    context::Context, events::append_events, parser::AgentEventItem, runtime::RunMode,
     tools::file_search::Search,
 };
 use anyhow::{Context as _, Ok, Result};

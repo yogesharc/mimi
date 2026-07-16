@@ -1,4 +1,5 @@
 use anyhow::{Context as _, Result, bail};
+use serde::Serialize;
 
 use super::parser::AgentEventItem;
 use super::response::get_response;
@@ -60,8 +61,7 @@ pub async fn run(
             let event = event?;
 
             if let RunMode::JsonStream = mode {
-                let json = serde_json::to_string(&event)?;
-                println!("{}", json);
+                print_json_line(&event)?;
             }
 
             match event {
@@ -120,8 +120,7 @@ pub async fn run(
                 let output = execute_tool_call(event, &search)?;
 
                 if let RunMode::JsonStream = mode {
-                    let json = serde_json::to_string(&output)?;
-                    println!("{json}");
+                    print_json_line(&output)?;
                 }
 
                 tool_call_outputs.push(output);
@@ -156,6 +155,14 @@ pub async fn run(
         }
     }
 
+    Ok(())
+}
+
+fn print_json_line(value: &impl Serialize) -> Result<()> {
+    let json = serde_json::to_string(value).context("failed to serialize JSONL output")?;
+    let mut stdout = io::stdout().lock();
+    writeln!(stdout, "{json}").context("failed to write JSONL output")?;
+    stdout.flush().context("failed to flush JSONL output")?;
     Ok(())
 }
 

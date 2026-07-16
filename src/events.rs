@@ -57,8 +57,7 @@ pub async fn append_events(
     let mut writer = BufWriter::new(file);
 
     for item in events {
-        let mut json =
-            serde_json::to_string_pretty(&item).context("failed to serialize session event")?;
+        let mut json = serde_json::to_string(&item).context("failed to serialize session event")?;
         json.push('\n');
 
         writer

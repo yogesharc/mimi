@@ -45,14 +45,8 @@ pub async fn runtime() -> Result<()> {
     search.index_cwd()?;
 
     match mode_arg {
-        Some(v) => {
-            if let Commands::Stdio = v {
-                json::run(&mut context, &search).await?
-            }
-        }
-        None => {
-            interactive::run(&mut context, &search).await?;
-        }
+        Some(Commands::Json) => json::run(&mut context, &search).await?,
+        None => interactive::run(&mut context, &search).await?,
     }
 
     Ok(())

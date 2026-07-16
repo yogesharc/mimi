@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde::{self, Serialize};
 use std::collections::HashMap;
 pub mod openai;
