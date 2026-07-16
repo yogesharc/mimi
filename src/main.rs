@@ -2,6 +2,7 @@
 use crate::runtime::runtime;
 
 mod agent_loop;
+mod approval;
 mod command_line_parser;
 mod context;
 mod events;

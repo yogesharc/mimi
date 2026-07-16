@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use serde_json::Value;
-pub mod approval;
 pub mod bash;
 pub mod edit;
 pub mod file_search;
@@ -12,7 +11,6 @@ pub mod write;
 use file_search::Search;
 
 use crate::tools::{
-    // approval::approve_tool,
     bash::{bash, def_bash},
     edit::{def_edit_file, edit_file},
     read::{def_read_file, read_file},
@@ -129,72 +127,19 @@ impl SystemTools {
         }
     }
 
+    pub fn requires_approval(&self) -> bool {
+        matches!(self, Self::WriteFile | Self::EditFile | Self::Bash)
+    }
+
     pub fn execute(&self, arguments: &str, search: Option<&Search>) -> Result<Value> {
         let args: Value =
             serde_json::from_str(arguments).context("failed to parse tool arguments as JSON")?;
 
         match self {
             SystemTools::ReadFile => read_file(args),
-            SystemTools::WriteFile => {
-                write_to_file(args)
-
-                // let overwrite = args
-                //     .get("overwrite")
-                //     .and_then(|v| v.as_bool())
-                //     .context("overwrite is missing")?;
-                // let mut approved = true;
-                // let path;
-
-                // if overwrite {
-                //     path = args
-                //         .get("path")
-                //         .and_then(|v| v.as_str())
-                //         .context("path is missing")?;
-
-                //     println!("ASKING APPROVAL -- WRITE -- {path}");
-
-                //     approved = approve_tool();
-                // }
-                // if approved {
-                //     write_to_file(args)
-                // } else {
-                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                // }
-            }
-            SystemTools::EditFile => {
-                edit_file(args)
-
-                // let path = args
-                //     .get("path")
-                //     .and_then(|v| v.as_str())
-                //     .context("path is missing")?;
-
-                // println!("ASKING APPROVAL -- EDIT -- {path}");
-
-                // let approved = approve_tool();
-
-                // if approved {
-                //     edit_file(args)
-                // } else {
-                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                // }
-            }
-            SystemTools::Bash => {
-                bash(args)
-                // let cmd = args
-                //     .get("command")
-                //     .and_then(|v| v.as_str())
-                //     .context("command is missing")?;
-
-                // println!("ASKING APPROVAL: {cmd}");
-                // let approved = approve_tool();
-
-                // if approved {
-                //     bash(args)
-                // } else {
-                //     Ok(serde_json::json!({"status": "tool call rejected by user"}))
-                // }
-            }
+            SystemTools::WriteFile => write_to_file(args),
+            SystemTools::EditFile => edit_file(args),
+            SystemTools::Bash => bash(args),
             SystemTools::SearchFiles => {
                 let search = search.context("search state is required")?;
                 search.search_files(args)
@@ -204,5 +149,24 @@ impl SystemTools {
                 search.search_content(args)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SystemTools;
+
+    #[test]
+    fn mutating_tools_require_approval() {
+        assert!(SystemTools::WriteFile.requires_approval());
+        assert!(SystemTools::EditFile.requires_approval());
+        assert!(SystemTools::Bash.requires_approval());
+    }
+
+    #[test]
+    fn read_only_tools_do_not_require_approval() {
+        assert!(!SystemTools::ReadFile.requires_approval());
+        assert!(!SystemTools::SearchFiles.requires_approval());
+        assert!(!SystemTools::SearchContent.requires_approval());
     }
 }

@@ -1,7 +1,11 @@
 use std::io::{self, Write};
 
 use crate::{
-    context::Context, events::append_events, parser::AgentEventItem, runtime::RunMode,
+    approval::{ApprovalDecision, ApprovalHandler, ApprovalRequest},
+    context::Context,
+    events::append_events,
+    parser::AgentEventItem,
+    runtime::RunMode,
     tools::file_search::Search,
 };
 use anyhow::{Context as _, Result};
@@ -14,6 +18,7 @@ const COMPACTION_PROMPT: &str = "Create a concise continuation summary of the co
 
 pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
     let mut session_id: String = String::new();
+    let mut approval_handler = JsonApprovalHandler;
 
     loop {
         let mut compaction = false;
@@ -47,7 +52,7 @@ pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
             JsonInput::Approval { call_id, approved } => {
                 print_json_line(&serde_json::json!({
                     "type": "error",
-                    "error": "approval commands are not implemented",
+                    "error": "no approval is currently pending",
                     "call_id": call_id,
                     "approved": approved
                 }))?;
@@ -95,10 +100,75 @@ pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
             &mut compaction,
             &mut user_msg_queue,
             &search,
+            &mut approval_handler,
         )
         .await?;
     }
     Ok(())
+}
+
+struct JsonApprovalHandler;
+
+impl ApprovalHandler for JsonApprovalHandler {
+    fn request_approval(&mut self, request: &ApprovalRequest<'_>) -> Result<ApprovalDecision> {
+        let arguments = serde_json::from_str::<serde_json::Value>(request.arguments)
+            .unwrap_or_else(|_| serde_json::Value::String(request.arguments.to_string()));
+
+        print_json_line(&serde_json::json!({
+            "type": "approval_required",
+            "call_id": request.call_id,
+            "tool": request.tool_name,
+            "arguments": arguments
+        }))?;
+
+        loop {
+            let Some(input) = ask_input()? else {
+                return Ok(ApprovalDecision::Rejected);
+            };
+
+            let command = match serde_json::from_str::<JsonInput>(&input) {
+                Ok(command) => command,
+                Err(error) => {
+                    print_json_line(&serde_json::json!({
+                        "type": "error",
+                        "error": "failed to parse approval response",
+                        "details": error.to_string()
+                    }))?;
+                    continue;
+                }
+            };
+
+            match command {
+                JsonInput::Approval { call_id, approved } if call_id == request.call_id => {
+                    return Ok(if approved {
+                        ApprovalDecision::Approved
+                    } else {
+                        ApprovalDecision::Rejected
+                    });
+                }
+                JsonInput::Approval { call_id, .. } => {
+                    print_json_line(&serde_json::json!({
+                        "type": "error",
+                        "error": "approval call_id does not match the pending tool call",
+                        "expected_call_id": request.call_id,
+                        "received_call_id": call_id
+                    }))?;
+                }
+                JsonInput::Prompt { .. } => {
+                    print_json_line(&serde_json::json!({
+                        "type": "error",
+                        "error": "an approval response is required before another prompt"
+                    }))?;
+                }
+                JsonInput::Exit => {
+                    print_json_line(&serde_json::json!({
+                        "type": "error",
+                        "error": "resolve the pending approval before exiting"
+                    }))?;
+                }
+            }
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -133,4 +203,32 @@ fn print_json_line(value: &impl Serialize) -> Result<()> {
     writeln!(stdout, "{json}").context("failed to write JSONL output")?;
     stdout.flush().context("failed to flush JSONL output")?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::JsonInput;
+
+    #[test]
+    fn parses_approval_command() {
+        let command: JsonInput =
+            serde_json::from_str(r#"{"type":"approval","call_id":"call_123","approved":true}"#)
+                .unwrap();
+
+        match command {
+            JsonInput::Approval { call_id, approved } => {
+                assert_eq!(call_id, "call_123");
+                assert!(approved);
+            }
+            _ => panic!("expected approval command"),
+        }
+    }
+
+    #[test]
+    fn rejects_approval_without_decision() {
+        let result =
+            serde_json::from_str::<JsonInput>(r#"{"type":"approval","call_id":"call_123"}"#);
+
+        assert!(result.is_err());
+    }
 }

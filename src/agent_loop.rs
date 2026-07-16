@@ -6,6 +6,7 @@ use super::response::get_response;
 use std::io::{self, Write};
 
 use crate::{
+    approval::{ApprovalDecision, ApprovalHandler, ApprovalRequest},
     context::Context,
     events::append_events,
     parser::OpenRouterEvents,
@@ -15,13 +16,14 @@ use crate::{
 
 const COMPACTION_PROMPT: &str = "Create a concise continuation summary of the conversation. Preserve the user's current goal, important decisions, relevant file paths and code details, tool results, errors, and unfinished work. Omit greetings, repetition, and obsolete discussion. Write only the summary needed for another assistant to continue the task without losing context.";
 
-pub async fn run(
+pub async fn run<A: ApprovalHandler>(
     mode: RunMode,
     context: &mut Context<'_>,
     session_id: &str,
     compaction: &mut bool,
     user_msg_queue: &mut Vec<AgentEventItem>,
     search: &Search,
+    approval_handler: &mut A,
 ) -> Result<()> {
     let mut tmp_event_logs: Vec<AgentEventItem> = vec![];
 
@@ -117,7 +119,7 @@ pub async fn run(
 
         for event in &tmp_event_logs {
             if let AgentEventItem::ToolCall { .. } = event {
-                let output = execute_tool_call(event, &search)?;
+                let output = execute_tool_call(event, &search, approval_handler)?;
 
                 if let RunMode::JsonStream = mode {
                     print_json_line(&output)?;
@@ -166,7 +168,11 @@ fn print_json_line(value: &impl Serialize) -> Result<()> {
     Ok(())
 }
 
-fn execute_tool_call(item: &AgentEventItem, search: &Search) -> Result<AgentEventItem> {
+fn execute_tool_call<A: ApprovalHandler>(
+    item: &AgentEventItem,
+    search: &Search,
+    approval_handler: &mut A,
+) -> Result<AgentEventItem> {
     if let AgentEventItem::ToolCall {
         id,
         call_id,
@@ -184,7 +190,28 @@ fn execute_tool_call(item: &AgentEventItem, search: &Search) -> Result<AgentEven
             _ => None,
         };
 
-        let output = SystemTools::execute(&tool, arguments, search_struct);
+        let approved = if tool.requires_approval() {
+            let request = ApprovalRequest {
+                call_id,
+                tool_name: name,
+                arguments,
+            };
+
+            matches!(
+                approval_handler.request_approval(&request)?,
+                ApprovalDecision::Approved
+            )
+        } else {
+            true
+        };
+
+        let output = if approved {
+            SystemTools::execute(&tool, arguments, search_struct)
+        } else {
+            Ok(serde_json::json!({
+                "status": "tool call rejected by user"
+            }))
+        };
 
         let output = match output {
             Ok(value) => value,
@@ -206,5 +233,45 @@ fn execute_tool_call(item: &AgentEventItem, search: &Search) -> Result<AgentEven
         Ok(tool_call_output)
     } else {
         bail!("not a tool call to execute")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{approval::ApprovalDecision, parser::ResponseStatus};
+
+    struct RejectApproval;
+
+    impl ApprovalHandler for RejectApproval {
+        fn request_approval(&mut self, _request: &ApprovalRequest<'_>) -> Result<ApprovalDecision> {
+            Ok(ApprovalDecision::Rejected)
+        }
+    }
+
+    #[test]
+    fn rejected_tool_call_returns_output_without_executing() {
+        let item = AgentEventItem::ToolCall {
+            id: "item_123".to_string(),
+            status: ResponseStatus::Completed,
+            call_id: "call_123".to_string(),
+            name: "bash".to_string(),
+            arguments: r#"{"command":"should-not-run"}"#.to_string(),
+        };
+        let search = Search::default();
+        let mut approval_handler = RejectApproval;
+
+        let output = execute_tool_call(&item, &search, &mut approval_handler).unwrap();
+
+        match output {
+            AgentEventItem::ToolCallOutput {
+                call_id, output, ..
+            } => {
+                assert_eq!(call_id, "call_123");
+                let output: serde_json::Value = serde_json::from_str(&output).unwrap();
+                assert_eq!(output["status"], "tool call rejected by user");
+            }
+            _ => panic!("expected tool call output"),
+        }
     }
 }

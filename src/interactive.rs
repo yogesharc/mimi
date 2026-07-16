@@ -1,7 +1,11 @@
 use std::io::{self, Write};
 
 use crate::{
-    context::Context, events::append_events, parser::AgentEventItem, runtime::RunMode,
+    approval::{ApprovalDecision, ApprovalHandler, ApprovalRequest},
+    context::Context,
+    events::append_events,
+    parser::AgentEventItem,
+    runtime::RunMode,
     tools::file_search::Search,
 };
 use anyhow::{Context as _, Ok, Result};
@@ -19,6 +23,7 @@ pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
     println!("");
 
     let mut session_id: String = String::new();
+    let mut approval_handler = InteractiveApprovalHandler;
 
     loop {
         let mut compaction = false;
@@ -70,10 +75,42 @@ pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
             &mut compaction,
             &mut user_msg_queue,
             &search,
+            &mut approval_handler,
         )
         .await?;
     }
     Ok(())
+}
+
+struct InteractiveApprovalHandler;
+
+impl ApprovalHandler for InteractiveApprovalHandler {
+    fn request_approval(&mut self, request: &ApprovalRequest<'_>) -> Result<ApprovalDecision> {
+        println!("\n\nApproval required for {}", request.tool_name);
+        println!("Arguments: {}", request.arguments);
+
+        loop {
+            print!("Allow this tool call? [y/N]: ");
+            io::stdout()
+                .flush()
+                .context("failed to flush approval prompt")?;
+
+            let mut input = String::new();
+            let bytes_read = io::stdin()
+                .read_line(&mut input)
+                .context("failed to read approval response")?;
+
+            if bytes_read == 0 {
+                return Ok(ApprovalDecision::Rejected);
+            }
+
+            match input.trim().to_ascii_lowercase().as_str() {
+                "y" | "yes" => return Ok(ApprovalDecision::Approved),
+                "n" | "no" | "" => return Ok(ApprovalDecision::Rejected),
+                _ => println!("Reply yes or no."),
+            }
+        }
+    }
 }
 
 fn ask_input() -> String {
