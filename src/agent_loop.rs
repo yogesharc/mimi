@@ -67,9 +67,45 @@ pub async fn run<A: ApprovalHandler>(
             }
 
             match event {
+                OpenRouterEvents::ResponseReasoningSummartPartAdded { .. } => {
+                    if let RunMode::Interactive = mode {
+                        println!("Reasoning:");
+                        let _ = io::stdout().flush();
+                    }
+                }
+                OpenRouterEvents::ResponseReasoningSummaryTextDelta { delta, .. } => {
+                    if let RunMode::Interactive = mode {
+                        print!("{delta}");
+                        let _ = io::stdout().flush();
+                    }
+                }
+                OpenRouterEvents::ResponseContentPartAdded { .. } => {
+                    if let RunMode::Interactive = mode {
+                        println!("");
+                        let _ = io::stdout().flush();
+                    }
+                }
                 OpenRouterEvents::ResponseOutputTextDelta { delta, .. } => {
                     if let RunMode::Interactive = mode {
                         print!("{delta}");
+                        let _ = io::stdout().flush();
+                    }
+                }
+                OpenRouterEvents::ResponseContentPartDone { .. } => {
+                    if let RunMode::Interactive = mode {
+                        println!("");
+                        let _ = io::stdout().flush();
+                    }
+                }
+                OpenRouterEvents::ResponseFunctionCallArgumentsDelta { .. } => {
+                    if let RunMode::Interactive = mode {
+                        print!("::");
+                        let _ = io::stdout().flush();
+                    }
+                }
+                OpenRouterEvents::ResponseFunctionCallArgumentsDone { .. } => {
+                    if let RunMode::Interactive = mode {
+                        println!("");
                         let _ = io::stdout().flush();
                     }
                 }

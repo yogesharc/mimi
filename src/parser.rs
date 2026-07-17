@@ -234,6 +234,19 @@ pub enum OpenRouterEvents {
         summary_index: u16,
         delta: String,
     },
+    #[serde(rename = "response.function_call_arguments.delta")]
+    ResponseFunctionCallArgumentsDelta {
+        output_index: u16,
+        item_id: String,
+        delta: String,
+    },
+    #[serde(rename = "response.function_call_arguments.done")]
+    ResponseFunctionCallArgumentsDone {
+        output_index: u16,
+        item_id: String,
+        name: String,
+        arguments: String,
+    },
     #[serde(rename = "response.output_item.done")]
     ResponseOutputItemDone {
         output_index: u16,
