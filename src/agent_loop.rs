@@ -69,6 +69,7 @@ pub async fn run<A: ApprovalHandler>(
             match event {
                 OpenRouterEvents::ResponseReasoningSummartPartAdded { .. } => {
                     if let RunMode::Interactive = mode {
+                        println!("=======================================");
                         println!("Reasoning:");
                         let _ = io::stdout().flush();
                     }
@@ -99,7 +100,7 @@ pub async fn run<A: ApprovalHandler>(
                 }
                 OpenRouterEvents::ResponseFunctionCallArgumentsDelta { .. } => {
                     if let RunMode::Interactive = mode {
-                        print!("::");
+                        print!(".");
                         let _ = io::stdout().flush();
                     }
                 }
@@ -155,7 +156,8 @@ pub async fn run<A: ApprovalHandler>(
 
         for event in &tmp_event_logs {
             if let AgentEventItem::ToolCall { .. } = event {
-                let output = execute_tool_call(event, &search, approval_handler)?;
+                let output =
+                    execute_tool_call(event, &search, session_id, approval_handler).await?;
 
                 if let RunMode::JsonStream = mode {
                     print_json_line(&output)?;
@@ -204,9 +206,10 @@ fn print_json_line(value: &impl Serialize) -> Result<()> {
     Ok(())
 }
 
-fn execute_tool_call<A: ApprovalHandler>(
+async fn execute_tool_call<A: ApprovalHandler>(
     item: &AgentEventItem,
     search: &Search,
+    session_id: &str,
     approval_handler: &mut A,
 ) -> Result<AgentEventItem> {
     if let AgentEventItem::ToolCall {
@@ -226,6 +229,11 @@ fn execute_tool_call<A: ApprovalHandler>(
             _ => None,
         };
 
+        let session = match &tool {
+            SystemTools::CreateTodoList => Some(session_id),
+            _ => None,
+        };
+
         let approved = if tool.requires_approval() {
             let request = ApprovalRequest {
                 call_id,
@@ -242,7 +250,7 @@ fn execute_tool_call<A: ApprovalHandler>(
         };
 
         let output = if approved {
-            SystemTools::execute(&tool, arguments, search_struct)
+            SystemTools::execute(&tool, arguments, search_struct, session).await
         } else {
             Ok(serde_json::json!({
                 "status": "tool call rejected by user"
@@ -285,8 +293,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rejected_tool_call_returns_output_without_executing() {
+    #[tokio::test]
+    async fn rejected_tool_call_returns_output_without_executing() {
         let item = AgentEventItem::ToolCall {
             id: "item_123".to_string(),
             status: ResponseStatus::Completed,
@@ -297,7 +305,9 @@ mod tests {
         let search = Search::default();
         let mut approval_handler = RejectApproval;
 
-        let output = execute_tool_call(&item, &search, &mut approval_handler).unwrap();
+        let output = execute_tool_call(&item, &search, "session_123", &mut approval_handler)
+            .await
+            .unwrap();
 
         match output {
             AgentEventItem::ToolCallOutput {

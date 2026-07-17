@@ -37,9 +37,8 @@ impl Context<'_> {
     pub fn build_system_prompt(&mut self) {
         let mut context: String = String::new();
 
-        // let system_prompt_path = PathBuf::from("src/prompts/codex_opencode.txt");
-        // let system_prompt = fs::read_to_string(system_prompt_path);
-        let system_prompt: Result<String> = Ok(String::new());
+        let system_prompt_path = PathBuf::from("src/prompts/system_prompt.md");
+        let system_prompt = fs::read_to_string(system_prompt_path);
 
         match system_prompt {
             Ok(v) => context.push_str(&v),
@@ -47,11 +46,9 @@ impl Context<'_> {
         }
 
         let agents_md_path = PathBuf::from("AGENTS.md");
-        let agents_md = fs::read_to_string(agents_md_path);
 
-        match agents_md {
-            Ok(v) => context.push_str(&v),
-            Err(e) => eprintln!("could not find agents md file: {e}"),
+        if let Ok(v) = fs::read_to_string(agents_md_path) {
+            context.push_str(&v);
         }
 
         if context.is_empty() {

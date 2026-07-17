@@ -7,6 +7,7 @@ pub mod bash;
 pub mod edit;
 pub mod file_search;
 pub mod read;
+pub mod todo;
 pub mod write;
 use file_search::Search;
 
@@ -14,6 +15,7 @@ use crate::tools::{
     bash::{bash, def_bash},
     edit::{def_edit_file, edit_file},
     read::{def_read_file, read_file},
+    todo::{create_todo_list, def_create_todo_list},
     write::{def_write_to_file, write_to_file},
 };
 // =========== Tools Structs and Enums =============
@@ -90,6 +92,7 @@ pub enum SystemTools {
     WriteFile,
     EditFile,
     Bash,
+    CreateTodoList,
 }
 
 impl SystemTools {
@@ -101,6 +104,7 @@ impl SystemTools {
             Self::WriteFile,
             Self::EditFile,
             Self::Bash,
+            Self::CreateTodoList,
         ]
     }
 
@@ -112,6 +116,7 @@ impl SystemTools {
             "bash" => Some(Self::Bash),
             "search_files" => Some(Self::SearchFiles),
             "search_content" => Some(Self::SearchContent),
+            "create_todo_list" => Some(Self::CreateTodoList),
             _ => None,
         }
     }
@@ -124,6 +129,7 @@ impl SystemTools {
             SystemTools::Bash => def_bash(),
             SystemTools::SearchFiles => Search::def_search_files(),
             SystemTools::SearchContent => Search::def_search_content(),
+            SystemTools::CreateTodoList => def_create_todo_list(),
         }
     }
 
@@ -131,7 +137,12 @@ impl SystemTools {
         matches!(self, Self::WriteFile | Self::EditFile | Self::Bash)
     }
 
-    pub fn execute(&self, arguments: &str, search: Option<&Search>) -> Result<Value> {
+    pub async fn execute(
+        &self,
+        arguments: &str,
+        search: Option<&Search>,
+        session_id: Option<&str>,
+    ) -> Result<Value> {
         let args: Value =
             serde_json::from_str(arguments).context("failed to parse tool arguments as JSON")?;
 
@@ -147,6 +158,10 @@ impl SystemTools {
             SystemTools::SearchContent => {
                 let search = search.context("search state is required")?;
                 search.search_content(args)
+            }
+            SystemTools::CreateTodoList => {
+                let session_id = session_id.context("session_id is required")?;
+                create_todo_list(session_id, args).await
             }
         }
     }
@@ -168,5 +183,6 @@ mod tests {
         assert!(!SystemTools::ReadFile.requires_approval());
         assert!(!SystemTools::SearchFiles.requires_approval());
         assert!(!SystemTools::SearchContent.requires_approval());
+        assert!(!SystemTools::CreateTodoList.requires_approval());
     }
 }

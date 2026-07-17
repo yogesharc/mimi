@@ -5,4 +5,4 @@ test
 frecency
 queries
 src/response_sample.json
-src/prompts
+src/prompts/codex.txt

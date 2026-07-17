@@ -16,8 +16,7 @@ use crate::agent_loop;
 const COMPACTION_PROMPT: &str = "Create a concise continuation summary of the conversation. Preserve the user's current goal, important decisions, relevant file paths and code details, tool results, errors, and unfinished work. Omit greetings, repetition, and obsolete discussion. Write only the summary needed for another assistant to continue the task without losing context.";
 
 pub async fn run(context: &mut Context<'_>, search: &Search) -> Result<()> {
-    println!("");
-    println!("============================");
+    println!("\n============================");
     println!("||     MIMI v0.1  ^_^     ||");
     println!("============================");
     println!("");
@@ -86,9 +85,11 @@ struct InteractiveApprovalHandler;
 
 impl ApprovalHandler for InteractiveApprovalHandler {
     fn request_approval(&mut self, request: &ApprovalRequest<'_>) -> Result<ApprovalDecision> {
-        println!("\n\nApproval required for {}", request.tool_name);
+        println!("\n========== APPROVAL REQUIRED ==========");
+        println!("Tool: {}", request.tool_name);
+        println!("=======================================");
         println!("Arguments: {}", request.arguments);
-
+        println!("=======================================");
         loop {
             print!("Allow this tool call? [y/N]: ");
             io::stdout()
@@ -118,8 +119,7 @@ fn ask_input() -> String {
 
     let mut input = String::new();
 
-    println!("");
-    println!("=======================================");
+    println!("\n=======================================");
     println!("Ask anything:");
 
     io::stdin()
