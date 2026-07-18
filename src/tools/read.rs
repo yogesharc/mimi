@@ -1,23 +1,27 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
 use std::{collections::HashMap, env, fs};
 
 use crate::tools::{Property, ToolDefinition};
 
 pub fn read_file(path: Value) -> Result<Value> {
-    let dir = env::current_dir().context("failed to get current directory")?;
+    let dir = env::current_dir()
+        .context("failed to get current directory")?
+        .canonicalize()?;
 
     let path = path
         .get("path")
         .and_then(|p| p.as_str())
         .context("missing path")?;
 
-    // println!("PATH: {path}");
+    let resolved = &dir.join(path).canonicalize()?;
 
-    let full_path = dir.join(path);
+    if !resolved.starts_with(&dir) {
+        bail!("path is outside the current working directory")
+    }
 
-    let content = fs::read_to_string(&full_path)
-        .with_context(|| format!("failed to read file {}", full_path.display()))?;
+    let content = fs::read_to_string(&resolved)
+        .with_context(|| format!("failed to read file {}", resolved.display()))?;
 
     // println!("READ FILE RESULT: {content}");
 
