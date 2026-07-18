@@ -52,7 +52,7 @@ pub async fn run<A: ApprovalHandler>(
         tmp_event_logs = Vec::new();
 
         let mut events = get_response(
-            context.model.unwrap().full_identifier(),
+            context.model.full_identifier(),
             &context.event_logs,
             context.effort.as_ref(),
             &context.system_prompt,

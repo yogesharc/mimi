@@ -28,10 +28,16 @@ pub fn write_to_file(args: Value) -> Result<Value> {
             .with_context(|| format!("failed to create directory {}", parent.display()))?;
     }
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(parsed_args.overwrite)
+    let mut options = OpenOptions::new();
+    options.write(true);
+
+    if parsed_args.overwrite {
+        options.create(true).truncate(true);
+    } else {
+        options.create_new(true);
+    }
+
+    let mut file = options
         .open(path)
         .with_context(|| format!("failed to open file {}", path.display()))?;
 
@@ -101,7 +107,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn write() {
+    fn overwrites_an_existing_file() {
         let path = "test/write_here.txt";
         let content = "hello world";
         let overwrite = true;
@@ -119,5 +125,21 @@ mod test {
         let content = output.get("content").and_then(|c| c.as_str()).unwrap();
 
         assert_eq!(content, "hello world")
+    }
+
+    #[test]
+    fn overwrite_false_preserves_an_existing_file() {
+        let path = "test/do_not_overwrite.txt";
+        fs::write(path, "existing content").unwrap();
+        let args = json!({
+            "path": path,
+            "content": "new",
+            "overwrite": false
+        });
+
+        let result = write_to_file(args);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "existing content");
     }
 }

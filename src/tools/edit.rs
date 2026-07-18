@@ -4,22 +4,22 @@ use std::{
     path::Path,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 use anyhow::{Context, Result, bail};
 
 use crate::tools::{Property, ToolDefinition};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Edit {
     path: String,
     r#type: EditType,
-    old_content: Option<String>,
-    new_content: Option<String>,
+    old_content: String,
+    new_content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 enum EditType {
     Replace,
     Delete,
@@ -34,31 +34,41 @@ pub fn edit_file(args: Value) -> Result<Value> {
     let mut content =
         read_to_string(path).with_context(|| format!("failed to read file {}", path.display()))?;
 
+    let match_index = find_unique_match(&content, &edit.old_content)?;
+    let match_end = match_index + edit.old_content.len();
+
     match edit.r#type {
-        EditType::Replace | EditType::Delete => {
-            let old_content = edit.old_content.as_deref().unwrap_or("");
-            let new_content = edit.new_content.as_deref().unwrap_or("");
-
-            let updated_content = content.replacen(old_content, new_content, 1);
-
-            fs::write(path, updated_content)
-                .with_context(|| format!("failed to write file {}", path.display()))?;
+        EditType::Replace => {
+            content.replace_range(match_index..match_end, &edit.new_content);
         }
+        EditType::Delete => content.replace_range(match_index..match_end, ""),
         EditType::Append => {
-            let old_content = edit.old_content.as_deref().unwrap_or("");
-            let new_content = edit.new_content.as_deref().unwrap_or("");
-
-            let Some(idx) = content.find(old_content) else {
-                bail!("old_content not found in file");
-            };
-            content.insert_str(idx + old_content.len(), new_content);
-
-            fs::write(path, content)
-                .with_context(|| format!("failed to write file {}", path.display()))?;
+            content.insert_str(match_end, &edit.new_content);
         }
     }
 
+    fs::write(path, content).with_context(|| format!("failed to write file {}", path.display()))?;
+
     Ok(serde_json::json!({"success:": "ok"}))
+}
+
+fn find_unique_match(content: &str, old_content: &str) -> Result<usize> {
+    if old_content.is_empty() {
+        bail!("old_content must not be empty");
+    }
+
+    let mut matches = content
+        .char_indices()
+        .filter_map(|(index, _)| content[index..].starts_with(old_content).then_some(index));
+    let Some(index) = matches.next() else {
+        bail!("old_content not found in file");
+    };
+
+    if matches.next().is_some() {
+        bail!("old_content matched more than once; provide more surrounding content");
+    }
+
+    Ok(index)
 }
 
 pub fn def_edit_file() -> ToolDefinition {
@@ -111,4 +121,61 @@ pub fn def_edit_file() -> ToolDefinition {
     ]);
 
     ToolDefinition::new(name, description, strict, properties, required)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn missing_old_content_returns_an_error_without_changing_the_file() {
+        let path = "test/edit_missing.txt";
+        fs::write(path, "original content").unwrap();
+        let args = json!({
+            "path": path,
+            "type": "Replace",
+            "old_content": "not present",
+            "new_content": "replacement"
+        });
+
+        let result = edit_file(args);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "original content");
+    }
+
+    #[test]
+    fn ambiguous_old_content_returns_an_error() {
+        let path = "test/edit_ambiguous.txt";
+        fs::write(path, "same and same").unwrap();
+        let args = json!({
+            "path": path,
+            "type": "Delete",
+            "old_content": "same",
+            "new_content": ""
+        });
+
+        let result = edit_file(args);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "same and same");
+    }
+
+    #[test]
+    fn overlapping_old_content_returns_an_error() {
+        let path = "test/edit_overlapping.txt";
+        fs::write(path, "aaa").unwrap();
+        let args = json!({
+            "path": path,
+            "type": "Replace",
+            "old_content": "aa",
+            "new_content": "b"
+        });
+
+        let result = edit_file(args);
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "aaa");
+    }
 }

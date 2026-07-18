@@ -20,12 +20,10 @@ pub async fn runtime() -> Result<()> {
     let effort_arg = cli.effort;
     let mode_arg = cli.command;
 
-    let mut context = Context::default();
-    context.build_system_prompt();
-
     let available_models = all_models();
     let selected_model = get_model(&model_arg, &available_models)?;
-    context.model = Some(selected_model);
+    let mut context = Context::new(selected_model);
+    context.build_system_prompt();
 
     let mut effort: Option<EffortLevel> = None;
 
