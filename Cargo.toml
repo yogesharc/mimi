@@ -2,6 +2,9 @@
 name = "mimi-ai"
 version = "0.1.0"
 edition = "2024"
+description = "A terminal AI coding agent with file, search, and bash tools"
+license = "MIT"
+repository = "https://github.com/yogesharc/mimi"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
