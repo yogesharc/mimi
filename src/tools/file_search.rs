@@ -7,7 +7,7 @@ use fff_search::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, fs};
 
 #[derive(Debug)]
 pub struct Search {
@@ -33,14 +33,18 @@ impl Search {
     pub fn index_cwd(&mut self) -> Result<()> {
         let dir_path = env::current_dir().context("failed to get current directory")?;
 
-        let frecency = FrecencyTracker::open(dir_path.join("frecency"))
+        // Search the workspace; keep fff state under .mimi so it doesn't pollute the project root.
+        let mimi_dir = dir_path.join(".mimi");
+        fs::create_dir_all(&mimi_dir).context("failed to create .mimi directory")?;
+
+        let frecency = FrecencyTracker::open(mimi_dir.join("frecency"))
             .context("failed to open frecency tracker")?;
         self.shared_frecency
             .init(frecency)
             .context("failed to initialize frecency tracker")?;
 
-        let query_tracker =
-            QueryTracker::open(dir_path.join("queries")).context("failed to open query tracker")?;
+        let query_tracker = QueryTracker::open(mimi_dir.join("queries"))
+            .context("failed to open query tracker")?;
 
         self.shared_query_tracker
             .init(query_tracker)

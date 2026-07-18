@@ -2,6 +2,7 @@
 .env
 todo.md
 test
+.mimi
 frecency
 queries
 src/response_sample.json
