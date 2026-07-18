@@ -3,7 +3,7 @@ use serde::{self, Serialize};
 use std::collections::HashMap;
 pub mod openai;
 
-#[derive(Debug, Serialize, strum::Display)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Providers {
     OpenAI,
